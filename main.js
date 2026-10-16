@@ -34,6 +34,26 @@ function getPlayerTotalAssets(p) {
 
 const CELL_BY_ID_PRE = {};
 
+const LABEL_POS = {
+  fukaya: "right",
+  nagatoro: "right",
+  okabe: "right",
+  hanno: "right",
+  konosu: "right",
+  iruma: "right",
+  kazo: "right",
+  koshigaya: "right",
+  urawa: "right",
+  tobu_zoo: "right",
+  ageo: "right",
+  kurihashi: "topleft",
+  soka: "top",
+  nishikawaguchi: "top",
+  warabi: "left",
+  moroyama: "left",
+  minamisakurai: "left",
+};
+
 function buildMap() {
   const cells = [];
   const cellMap = new Map();
@@ -43,6 +63,7 @@ function buildMap() {
 
   for (const st of STATIONS) {
     add({ id:nextId, type:CELL.STATION, name:st.name,
+          stationKey: st.id,
           region:st.region, kind:st.kind, x:st.x, y:st.y, next:[] });
     stationIdMap[st.id] = nextId;
     nextId++;
@@ -144,6 +165,7 @@ let pendingSettlement = false;
 let pendingSettlementCallback = null;
 let pendingNextTurn = false;
 let hasRolledThisTurn = false;
+let isShowingGoalPopup = false;
 const poos = new Set();
 
 let userZoom = 0.9;
@@ -304,6 +326,9 @@ function drawBoard() {
     if (c.name) {
       const label = document.createElement("div");
       label.className = "station-label";
+      if (c.stationKey && LABEL_POS[c.stationKey]) {
+        label.classList.add("label-" + LABEL_POS[c.stationKey]);
+      }
       label.textContent = c.name;
       el.appendChild(label);
     }
@@ -710,10 +735,13 @@ function autoWalkTo(targetId, reachable) {
     applyCamera();
   }
 
+  if (!lastWasBacktrack && path.length > 0) {
+    applyCellEffect(player.pos);
+  }
+
+  if (isShowingGoalPopup) return;
+
   if (remainingSteps <= 0) {
-    if (!lastWasBacktrack && path.length > 0) {
-      applyCellEffect(player.pos);
-    }
     endMove();
     return;
   }
@@ -854,6 +882,7 @@ function applyCellEffect(cellId) {
       drawBoard();
     }
 
+    isShowingGoalPopup = true;
     showGoalArrivalPopup(arrivedPlayerName, arrivedGoalName, prize, happyBonus, nextGoalName, arrivedCellId);
   } else if (c.kind === "goal" || c.kind === "prop") {
     if (player.isCPU) {
@@ -912,6 +941,8 @@ function showGoalArrivalPopup(arrivedPlayer, goalName, prize, happyBonus, nextGo
       dialog.classList.add("hidden");
       try { playSound("pop"); } catch (e) {}
 
+      isShowingGoalPopup = false;
+
       setTimeout(() => {
         try {
           if (goalCellId && player && !player.isCPU) {
@@ -925,9 +956,17 @@ function showGoalArrivalPopup(arrivedPlayer, goalName, prize, happyBonus, nextGo
           console.warn("Property dialog error:", e);
         }
 
+        if (remainingSteps > 0 && turnInProgress && isMoving) {
+          updateHUD();
+          showMoveTargets();
+          return;
+        }
+
         if (pendingNextTurn) {
           pendingNextTurn = false;
           checkPendingDialogsOrProceed();
+        } else {
+          endMove();
         }
       }, 120);
     };
@@ -1122,6 +1161,7 @@ function beginTurn(p) {
 
   applyPlayerBuffs(p);
   hasRolledThisTurn = false;
+  isShowingGoalPopup = false;
 
   thisTurn = { diceCount: 1 };
   if (p.buffs.renchanKakekko) thisTurn.diceCount = 2;
@@ -1836,6 +1876,7 @@ function startGame(config) {
   pendingSettlementCallback = null;
   pendingNextTurn = false;
   hasRolledThisTurn = false;
+  isShowingGoalPopup = false;
   panOffsetX = 0;
   panOffsetY = 0;
   userZoom = 0.9;
