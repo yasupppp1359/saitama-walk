@@ -1,5 +1,5 @@
 // ========================================
-// main.js - ゲームロジック（オートセーブ・ゴール修正版）
+// main.js - ゲームロジック（修正完全版）
 // ========================================
 
 window.onerror = (msg, url, line) => {
@@ -188,11 +188,12 @@ function log(msg) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-// ===== オートセーブ =====
+// ===== オートセーブ（バージョン2） =====
 function autoSave() {
   if (!players || players.length === 0) return;
   try {
     const data = {
+      version: 2,
       players: players.map(p => ({
         id: p.id, name: p.name, icon: p.icon,
         money: p.money, pos: p.pos,
@@ -216,6 +217,12 @@ function loadAutoSave() {
   if (!raw) return false;
   try {
     const data = JSON.parse(raw);
+    // バージョンチェック：古いセーブは無効化
+    if (!data.version || data.version < 2) {
+      console.log("古いセーブデータのため無効化");
+      localStorage.removeItem("saitama_auto");
+      return false;
+    }
     if (!data.players || data.players.length === 0) return false;
     players = data.players;
     currentPlayerIndex = data.currentPlayerIndex || 0;
@@ -513,9 +520,18 @@ function shortestDistance(from, goal) {
   while (q.length) {
     const [id, d] = q.shift();
     if (id === goal) return d;
-    for (const n of CELL_BY_ID[id].next) {
-      if (poos.has(n) || seen.has(n)) continue;
-      seen.add(n); q.push([n, d + 1]);
+    const cell = CELL_BY_ID[id];
+    if (cell && cell.next) {
+      for (const n of cell.next) {
+        if (poos.has(n) || seen.has(n)) continue;
+        seen.add(n); q.push([n, d + 1]);
+      }
+    }
+    if (PARENTS[id]) {
+      for (const p of PARENTS[id]) {
+        if (poos.has(p) || seen.has(p)) continue;
+        seen.add(p); q.push([p, d + 1]);
+      }
     }
   }
   return Infinity;
@@ -682,6 +698,7 @@ function clearHighlights() {
 
 function applyCellEffect(cellId) {
   const c = CELL_BY_ID[cellId];
+  if (!c) return;
 
   if (c.type === CELL.EVENT) {
     playSound("event");
@@ -1001,6 +1018,7 @@ function beginTurn(p) {
 
   drawAllPlayers();
   applyCamera();
+  updateHUD();
 
   if (p.isCPU) {
     turnInProgress = true;
@@ -1634,7 +1652,7 @@ function startGame(config) {
   // 新規開始時にオートセーブをクリア
   localStorage.removeItem("saitama_auto");
 
-  // ★ GOAL_IDを確実に初期化
+  // GOAL_IDを確実に初期化
   for (const c of MAP) c.isGoal = false;
   GOAL_ID = stationIdMap["fukaya"];
   CELL_BY_ID[GOAL_ID].isGoal = true;
@@ -1714,18 +1732,23 @@ setupPan();
 (function checkAutoLoad() {
   const raw = localStorage.getItem("saitama_auto");
   if (!raw) {
-    // セーブなし → そのまま開始画面
     log("🚃 埼玉散歩日和り へようこそ！");
     log("🎮 設定を選んで「ゲームスタート」を押してください");
     return;
   }
   try {
     const data = JSON.parse(raw);
+    if (!data.version || data.version < 2) {
+      console.log("古いセーブデータのため無効化");
+      localStorage.removeItem("saitama_auto");
+      log("🚃 埼玉散歩日和り へようこそ！");
+      log("🎮 設定を選んで「ゲームスタート」を押してください");
+      return;
+    }
     if (!data.players || data.players.length === 0) {
       log("🚃 埼玉散歩日和り へようこそ！");
       return;
     }
-    // 再開ダイアログを表示
     const dialog = document.getElementById("resumeDialog");
     const detail = document.getElementById("resumeDetail");
     dialog.classList.remove("hidden");
