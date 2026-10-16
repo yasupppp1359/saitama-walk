@@ -40,7 +40,6 @@
                 transform-origin: 0 0; transition: transform .35s ease-out; }
   #lines { position:absolute; top:0; left:0; pointer-events:none; }
 
-  /* ===== ゴールバナー ===== */
   #goalBanner {
     position: absolute; top: 8px; left: 50%;
     transform: translateX(-50%);
@@ -60,7 +59,6 @@
   #goalBanner .goalLabel { font-size: 12px; }
   #goalBanner .goalName { font-size: 14px; }
 
-  /* ===== パン用ヒント ===== */
   #panHint {
     position: absolute; bottom: 8px; left: 50%;
     transform: translateX(-50%);
@@ -446,6 +444,35 @@
   .goalPanel .btnYes { background: linear-gradient(135deg,#5cb85c,#3c903c); color: #fff; }
   .goalPanel .btnNo { background: linear-gradient(135deg,#888,#555); color: #fff; }
 
+  /* ===== 再開ダイアログ ===== */
+  #resumeDialog {
+    position: fixed; inset: 0;
+    background: linear-gradient(135deg, #7cc4ff 0%, #f0a0e0 50%, #ffd060 100%);
+    z-index: 600; display: flex; justify-content: center; align-items: center;
+    padding: 20px;
+  }
+  #resumeDialog.hidden { display: none; }
+  .resumePanel {
+    background: #fff; border-radius: 20px; padding: 24px;
+    width: min(400px, 100%); text-align: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,.3);
+  }
+  .resumePanel h2 { margin: 0 0 12px; font-size: 22px; }
+  .resumeInfo { font-size: 14px; color: #666; margin: 8px 0; }
+  .resumeDetail {
+    font-size: 16px; font-weight: bold; color: #4060d0;
+    padding: 10px; background: #eef; border-radius: 10px;
+    margin: 12px 0 20px;
+  }
+  .resumeBtnRow { display: flex; gap: 10px; }
+  .resumeBtnRow button {
+    flex: 1; padding: 14px; font-size: 15px; font-weight: bold;
+    border-radius: 12px; border: none; cursor: pointer;
+    min-height: 54px;
+  }
+  .resumeYes { background: linear-gradient(135deg,#5cb85c,#3c903c); color: #fff; }
+  .resumeNo { background: linear-gradient(135deg,#7c9cff,#4060d0); color: #fff; }
+
   #startScreen {
     position: fixed; inset: 0;
     background: linear-gradient(135deg, #7cc4ff 0%, #f0a0e0 50%, #ffd060 100%);
@@ -623,6 +650,18 @@
   </div>
 </div>
 
+<div id="resumeDialog" class="hidden">
+  <div class="resumePanel">
+    <h2>🚃 埼玉散歩日和り</h2>
+    <p class="resumeInfo">前回の続きがあります</p>
+    <p class="resumeDetail" id="resumeDetail">-</p>
+    <div class="resumeBtnRow">
+      <button id="resumeBtn" class="resumeYes">▶ 続きから</button>
+      <button id="newGameBtn" class="resumeNo">🆕 新規ゲーム</button>
+    </div>
+  </div>
+</div>
+
 <div id="startScreen">
   <div class="startPanel">
     <h1>🚃 埼玉散歩日和り</h1>
@@ -667,7 +706,6 @@
 <script src="start.js"></script>
 
 <script>
-// ===== Service Worker 登録 =====
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./service-worker.js")
