@@ -143,6 +143,7 @@ let currentPlayerIndex = 0;
 let pendingSettlement = false;
 let pendingSettlementCallback = null;
 let pendingNextTurn = false;
+let hasRolledThisTurn = false;
 const poos = new Set();
 
 let userZoom = 0.9;
@@ -568,12 +569,14 @@ function shortestDistance(from, goal) {
 }
 
 function rollDice() {
+  if (hasRolledThisTurn) return;
   if (!player || player.isCPU) return;
   if (isMoving || !canRoll) return;
   playSound("dice");
   canUseCard = false;
   canRoll = false;
   turnInProgress = true;
+  hasRolledThisTurn = true;
 
   let count = thisTurn.diceCount;
   if (player.buffs.nonbiri > 0) {
@@ -907,20 +910,26 @@ function showGoalArrivalPopup(arrivedPlayer, goalName, prize, happyBonus, nextGo
   if (okBtn) {
     okBtn.onclick = () => {
       dialog.classList.add("hidden");
-      playSound("pop");
+      try { playSound("pop"); } catch (e) {}
 
-      if (goalCellId && !player.isCPU) {
-        const props = getPropsAtStation(goalCellId);
-        if (props.length > 0) {
-          openPropDialog(goalCellId);
-          return;
+      setTimeout(() => {
+        try {
+          if (goalCellId && player && !player.isCPU) {
+            const props = getPropsAtStation(goalCellId);
+            if (props && props.length > 0) {
+              openPropDialog(goalCellId);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn("Property dialog error:", e);
         }
-      }
 
-      if (pendingNextTurn) {
-        pendingNextTurn = false;
-        checkPendingDialogsOrProceed();
-      }
+        if (pendingNextTurn) {
+          pendingNextTurn = false;
+          checkPendingDialogsOrProceed();
+        }
+      }, 120);
     };
   }
 }
@@ -1112,6 +1121,7 @@ function beginTurn(p) {
   }
 
   applyPlayerBuffs(p);
+  hasRolledThisTurn = false;
 
   thisTurn = { diceCount: 1 };
   if (p.buffs.renchanKakekko) thisTurn.diceCount = 2;
@@ -1441,6 +1451,7 @@ function startFixedMove(n) {
   canUseCard = false;
   canRoll = false;
   turnInProgress = true;
+  hasRolledThisTurn = true;
   remainingSteps = n;
   isMoving = true;
   turnPath = [player.pos];
@@ -1824,6 +1835,7 @@ function startGame(config) {
   pendingSettlement = false;
   pendingSettlementCallback = null;
   pendingNextTurn = false;
+  hasRolledThisTurn = false;
   panOffsetX = 0;
   panOffsetY = 0;
   userZoom = 0.9;
