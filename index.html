@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>埼玉散歩日和り</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#223344">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="埼玉散歩">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<style>
+  * { box-sizing: border-box; touch-action: manipulation; }
+  body { margin:0; font-family:'Hiragino Sans','Yu Gothic',sans-serif;
+         background:#f5f5f0; overflow:hidden;
+         display:flex; flex-direction:column; height:100vh; }
+
+  #hud { flex: 0 0 auto; background:linear-gradient(90deg,#223 0%,#445 100%);
+         color:#fff; padding:6px 10px; display:flex; gap:10px;
+         font-size:12px; flex-wrap:wrap; align-items:center; }
+  #turnInfo { padding:3px 10px; border-radius:14px; background:#4af;
+              font-weight:bold; color:#fff; font-size:12px; }
+  #money { font-weight:bold; color:#ffd700; }
+  #money.debt { color:#ff6060; animation: debtBlink 1s infinite; }
+  @keyframes debtBlink { 0%,100%{opacity:1;} 50%{opacity:.5;} }
+  #day, #month { color:#ccf; }
+
+  #board { flex:1 1 auto; min-height:0; position:relative;
+           overflow:hidden;
+           background:
+             radial-gradient(circle at 15% 20%, rgba(200,230,200,.65) 0%, transparent 40%),
+             radial-gradient(circle at 85% 75%, rgba(180,220,245,.55) 0%, transparent 40%),
+             radial-gradient(circle at 50% 50%, rgba(255,225,225,.35) 0%, transparent 55%),
+             linear-gradient(135deg, #f0f8e8 0%, #eaf3f8 50%, #f8f0f5 100%);
+  }
+  #boardInner { position:absolute; width:1800px; height:1400px;
+                transform-origin: 0 0; transition: transform .35s ease-out; }
+  #lines { position:absolute; top:0; left:0; pointer-events:none; }
+
+  .cell { position:absolute; width:22px; height:22px; border-radius:50%;
+          display:flex; align-items:center; justify-content:center;
+          font-size:11px; cursor:pointer;
+          transform: translate(-50%, -50%);
+          touch-action: manipulation;
+          box-shadow: 0 1px 2px rgba(0,0,0,.15);
+          transition: transform .12s; }
+  .cell:hover { transform: translate(-50%, -50%) scale(1.15); }
+  .plus  { background:radial-gradient(circle at 30% 30%, #7cc4ff, #2a8ce0);
+           border:1px solid #1874c0; }
+  .minus { background:radial-gradient(circle at 30% 30%, #ff8080, #d03030);
+           border:1px solid #a02020; }
+  .card  { background:radial-gradient(circle at 30% 30%, #ffe066, #e0a800);
+           border:1px solid #a07000; }
+  .cell.yellowed { background:radial-gradient(circle at 30% 30%, #ffe066, #e0a800) !important;
+                   border-color:#a07000 !important; }
+  .event { background:radial-gradient(circle at 30% 30%, #ffe0ff, #d060d0);
+           border:1px solid #a030a0;
+           animation: eventGlow 1.5s infinite; }
+  @keyframes eventGlow {
+    0%, 100% { box-shadow: 0 1px 2px rgba(0,0,0,.15), 0 0 0 0 rgba(224,96,224,.6); }
+    50%      { box-shadow: 0 1px 2px rgba(0,0,0,.15), 0 0 0 6px rgba(224,96,224,0); }
+  }
+  .heli { background:radial-gradient(circle at 30% 30%, #c0ffd0, #40c060);
+          border:1px solid #208040;
+          animation: heliSpin 2s infinite linear; }
+  @keyframes heliSpin {
+    0%,100% { transform: translate(-50%, -50%) rotate(0deg); }
+    50%     { transform: translate(-50%, -50%) rotate(180deg); }
+  }
+  .nice { background:radial-gradient(circle at 30% 30%, #c0e0ff, #4080e0);
+          border:1px solid #204080;
+          box-shadow: 0 0 8px rgba(64,128,224,.8); }
+  .shop { background:radial-gradient(circle at 30% 30%, #ffe0a0, #e08040);
+          border:1px solid #a05020; }
+
+  .cell.station { width:48px; height:48px; border-radius:12px;
+                  border:3px solid #666; background:#fff;
+                  font-size:24px; z-index:2;
+                  box-shadow: 0 3px 8px rgba(0,0,0,.18); }
+  .region-north  { background:linear-gradient(135deg,#e0f5e0,#c8e6c9);
+                   border-color:#2e7d32; }
+  .region-east   { background:linear-gradient(135deg,#e0efff,#bbdefb);
+                   border-color:#1565c0; }
+  .region-center { background:linear-gradient(135deg,#ffe5ea,#ffcdd2);
+                   border-color:#c62828; }
+  .region-west   { background:linear-gradient(135deg,#ffeac9,#ffe0b2);
+                   border-color:#ef6c00; }
+
+  .cell.station.goal-station {
+    background:linear-gradient(135deg,#ffb8ff,#f080f0);
+    border-color:#a0a;
+    width:56px; height:56px; font-size:28px; z-index:3;
+    animation: goalPulse 1.6s infinite ease-in-out;
+  }
+  @keyframes goalPulse {
+    0%, 100% { box-shadow: 0 3px 8px rgba(0,0,0,.18), 0 0 0 0 rgba(240,128,240,.6); }
+    50%      { box-shadow: 0 3px 8px rgba(0,0,0,.18), 0 0 0 8px rgba(240,128,240,0); }
+  }
+
+  .cell.prop-station {
+    background:linear-gradient(135deg,#fff0d0,#ffd890);
+    border-color:#ef6c00;
+    width:42px; height:42px; font-size:20px;
+  }
+
+  .station-label { position:absolute; top: calc(100% + 4px); left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,.96);
+    padding: 2px 7px; border-radius: 10px;
+    font-size: 11px; font-weight: bold; color: #333;
+    white-space: nowrap; pointer-events: none;
+    border: 1px solid #ccc;
+    box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+
+  .player { position:absolute; width:28px; height:28px;
+    font-size:22px; z-index:50; pointer-events:none;
+    display:flex; align-items:center; justify-content:center;
+    transform: translate(-50%, -50%);
+    border-radius:50%; border:3px solid #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  .player.p0 { background:linear-gradient(135deg,#7cc4ff,#2a8ce0); }
+  .player.p1 { background:linear-gradient(135deg,#ffb060,#f08020); }
+  .player.p2 { background:linear-gradient(135deg,#a0e070,#60a020); }
+  .player.p3 { background:linear-gradient(135deg,#ff90c0,#e05090); }
+  .player.active { animation: pulsePlayer 0.9s infinite; z-index:60; }
+  @keyframes pulsePlayer {
+    0%,100% { transform: translate(-50%,-50%) scale(1); }
+    50%     { transform: translate(-50%,-50%) scale(1.3); }
+  }
+
+  .cell.highlight { outline: 3px solid #0f0; outline-offset: 2px;
+    z-index: 30; animation: blink 0.7s infinite; }
+  .cell.highlight[data-dist]::after {
+    content: attr(data-dist); position: absolute;
+    top: -16px; left: 50%; transform: translateX(-50%);
+    background: #0a0; color: #fff; font-size: 11px;
+    padding: 1px 6px; border-radius: 10px; font-weight: bold;
+    pointer-events: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:.45;} }
+
+  #log { flex: 0 0 auto; height: 84px; padding: 6px 10px;
+         background: #fafbfd; border-top: 1px solid #dde;
+         overflow-y: auto; }
+  #log > div {
+    display: inline-block;
+    background: #f0f4ff;
+    border-radius: 12px;
+    padding: 4px 12px;
+    margin: 3px 4px 3px 0;
+    font-size: 12px;
+    max-width: 100%;
+    animation: bubbleIn .25s ease-out;
+    border: 1px solid #dde4ff;
+  }
+  #log > div.warn { background:#fee; border-color:#faa; color:#c00; }
+  @keyframes bubbleIn {
+    from { opacity: 0; transform: translateY(6px) scale(.95); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  #controls { flex: 0 0 auto; background:#223; color:#fff; padding:6px 8px;
+    display:flex; gap:5px; flex-wrap:wrap; }
+  button { padding:8px 12px; font-size:12px; cursor:pointer;
+    border-radius:8px; border:none; min-height:42px;
+    font-weight:bold;
+    transition: transform .1s; }
+  button:active { transform: scale(.95); }
+  #rollBtn { background:linear-gradient(135deg,#5cb85c,#3c903c); color:#fff; }
+  #cardBtn { background:linear-gradient(135deg,#f0ad4e,#d08020); color:#fff; }
+  #propBtn { background:linear-gradient(135deg,#5bc0de,#3090b0); color:#fff; }
+  #rankBtn { background:linear-gradient(135deg,#ffd700,#c0a000); color:#333; }
+  #goalReachBtn { background:linear-gradient(135deg,#ff7090,#d03060); color:#fff; display:none; }
+  #goalReachBtn.show { display:inline-block; animation: goalReachPulse 1s infinite; }
+  @keyframes goalReachPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,112,144,.8); }
+    50%     { box-shadow: 0 0 0 8px rgba(255,112,144,0); }
+  }
+  #mapToggleBtn { background:linear-gradient(135deg,#7c9cff,#4060d0); color:#fff; }
+  #muteBtn { background:linear-gradient(135deg,#a070e0,#6040b0); color:#fff; }
+  #saveBtn, #loadBtn { background:#666; color:#fff; }
+  #debugBtn { background:#888; color:#fff; font-size:10px; }
+  button:disabled { background:#555 !important; cursor:not-allowed; opacity:.5; }
+
+  #handPanel { position: fixed; left:0; right:0; bottom:0; background:#fff;
+    border-top: 3px solid #223; padding: 10px; max-height: 60vh;
+    overflow-y: auto; z-index: 100;
+    transition: transform .25s ease-out;
+    box-shadow: 0 -4px 12px rgba(0,0,0,.25);
+    border-radius: 16px 16px 0 0; }
+  #handPanel.hidden { transform: translateY(110%); pointer-events: none; }
+  .handHeader { display:flex; justify-content:space-between; align-items:center;
+    font-weight:bold; margin-bottom:8px;
+    padding-bottom:6px; border-bottom:1px solid #ccc; }
+  .handHeader button { padding:6px 12px; font-size:12px;
+    background:#f80; color:#fff; }
+  #handList { display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 6px; }
+  .handCard { border: 2px solid #888; border-radius: 8px;
+    padding: 6px 4px; text-align: center; cursor: pointer;
+    font-size: 11px; transition: transform .1s; user-select: none; }
+  .handCard:hover { transform: scale(1.05); }
+  .handCard:active { transform: scale(.95); }
+  .handCard .cIcon { font-size: 22px; display:block; margin-bottom:2px; }
+  .handCard .cName { font-weight:bold; font-size:11px;
+    display:block; margin-bottom:2px; }
+  .handCard .cCat { font-size:9px; color:#555; }
+  .handCard.move  { background:#cee; }
+  .handCard.warp  { background:#ecf; }
+  .handCard.prop  { background:#cfc; }
+  .handCard.util  { background:#ffc; }
+  .handCard.money { background:#ffe4b3; }
+  .handCard.jama  { background:#fcc; }
+  
+  #propDialog { position: fixed; left:50%; top:50%;
+    transform: translate(-50%, -50%);
+    width: min(440px, 94vw); max-height: 80vh; overflow-y: auto;
+    background:#fff; border-radius:14px; z-index:200;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    padding: 16px; }
+  #propDialog.hidden { display:none; }
+  .propHeader { display:flex; justify-content:space-between;
+    align-items:center; margin-bottom:10px;
+    padding-bottom:6px; border-bottom:2px solid #223; }
+  .propHeader .name { font-weight:bold; font-size:15px; }
+  .propHeader button { padding:6px 12px; font-size:12px;
+    background:#888; color:#fff; }
+  .propItem { display:flex; justify-content:space-between;
+    align-items:center; padding:8px 6px;
+    border-bottom:1px solid #eee; }
+  .propItem .info { flex:1; }
+  .propItem .icon { font-size:20px; margin-right:6px; }
+  .propItem .name { font-weight:bold; font-size:13px; }
+  .propItem .type { font-size:11px; color:#666; }
+  .propItem .price { font-size:13px; font-weight:bold;
+    color:#c60; margin-top:2px; }
+  .propItem button { padding:8px 14px;
+    background:linear-gradient(135deg,#5cb85c,#3c903c);
+    color:#fff; font-weight:bold; font-size:12px; }
+  .propItem button:disabled { background:#ccc; cursor:not-allowed; }
+
+  #debtDialog { position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 300;
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px; }
+  #debtDialog.hidden { display: none; }
+  .debtPanel {
+    background: linear-gradient(135deg,#fff5f5,#ffe0e0);
+    border-radius: 18px;
+    padding: 20px;
+    width: min(440px, 100%);
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(200,0,0,.5);
+    border: 3px solid #d03030;
+  }
+  .debtPanel h2 { margin: 0 0 8px; color: #c00; font-size: 20px; text-align: center; }
+  .debtPanel .debtInfo {
+    text-align: center; margin-bottom: 12px;
+    font-size: 14px; font-weight: bold; color: #333;
+  }
+  .debtPanel .debtInfo .debtAmount {
+    color: #c00; font-size: 18px; display: block; margin-top: 4px;
+  }
+  .debtPanel .debtMsg {
+    text-align: center; font-size: 12px; color: #666;
+    margin-bottom: 12px;
+    padding: 8px; background: rgba(255,255,255,.7);
+    border-radius: 8px;
+  }
+  #debtList { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .debtItem {
+    display: flex; justify-content: space-between;
+    align-items: center;
+    background: #fff; border-radius: 10px;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+  }
+  .debtItem .info { flex: 1; font-size: 12px; }
+  .debtItem .name { font-weight: bold; }
+  .debtItem .type { font-size: 11px; color: #666; }
+  .debtItem .price { font-size: 12px; font-weight: bold; color: #c60; }
+  .debtItem .sellPrice { font-size: 12px; font-weight: bold; color: #0a0; }
+  .debtItem button {
+    padding: 8px 14px;
+    background: linear-gradient(135deg,#e0a020,#c08020);
+    color: #fff; font-weight: bold; font-size: 12px;
+  }
+  .debtItem button.sell {
+    background: linear-gradient(135deg,#d04040,#a02020);
+  }
+  .debtItem button:disabled { background:#ccc; cursor:not-allowed; }
+  .debtItem .locked {
+    font-size: 10px; color: #999; padding: 4px 8px;
+    background: #f0f0f0; border-radius: 6px;
+  }
+  .debtFooter {
+    text-align: center; font-size: 12px; color: #666;
+    padding-top: 8px; border-top: 1px solid #ddd;
+  }
+
+  #settleDialog { position: fixed; inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 300;
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px; }
+  #settleDialog.hidden { display: none; }
+  .settlePanel {
+    background: linear-gradient(135deg,#fffbf0,#fff0d0);
+    border-radius: 18px; padding: 18px;
+    width: min(460px, 100%);
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(200,150,0,.5);
+    border: 3px solid #e0a020;
+  }
+  .settlePanel h2 { margin: 0 0 4px; color: #a06000;
+    font-size: 20px; text-align: center; }
+  .settlePanel .subtitle2 { text-align: center;
+    font-size: 12px; color: #666; margin-bottom: 12px; }
+  .settleTable { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  .settleTable th { background: #ffe8b0; padding: 6px 8px;
+    font-size: 12px; border: 1px solid #e0c080; }
+  .settleTable td { padding: 6px 8px; font-size: 13px;
+    border: 1px solid #eee; background: #fff; }
+  .settleTable .name { font-weight: bold; }
+  .settleTable .gain { text-align: right; color: #0a0; font-weight: bold; }
+  .settleTable .gain.zero { color: #888; font-weight: normal; }
+  .rankRow { display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; margin-bottom: 4px;
+    background: #fff; border-radius: 8px;
+    border: 1px solid #eee; font-size: 13px; }
+  .rankRow.rank1 { background: linear-gradient(135deg,#fff7d0,#ffe080);
+    border-color: #e0a020; font-weight: bold; }
+  .rankRow .rankPos { font-size: 18px; min-width: 30px; text-align: center; }
+  .rankRow .rankName { flex: 1; font-weight: bold; }
+  .rankRow .rankMoney { font-weight: bold; color: #c60; }
+  .settleBtn {
+    width: 100%; padding: 12px;
+    background: linear-gradient(135deg,#e0a020,#c08020);
+    color: #fff; font-size: 15px; font-weight: bold;
+    border-radius: 10px; border: none; cursor: pointer;
+    min-height: 48px;
+  }
+
+  #rankDialog, #endDialog { position: fixed; inset: 0;
+    background: rgba(0,0,0,.65);
+    z-index: 320;
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px; }
+  #rankDialog.hidden, #endDialog.hidden { display: none; }
+  .rankPanel {
+    background: linear-gradient(135deg,#fff,#f0f4ff);
+    border-radius: 20px; padding: 20px;
+    width: min(480px, 100%);
+    max-height: 92vh; overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    border: 3px solid #4060d0;
+  }
+  .rankPanel h2 { margin: 0 0 6px; text-align: center;
+    font-size: 22px; color: #4060d0; }
+  .rankPanel .date { text-align: center;
+    font-size: 12px; color: #666; margin-bottom: 14px; }
+  .rankPanel .row { display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; margin-bottom: 6px;
+    background: #fff; border-radius: 10px;
+    border: 2px solid #ddd; font-size: 14px; }
+  .rankPanel .row.rank1 { background: linear-gradient(135deg,#fff7d0,#ffe080);
+    border-color: #e0a020; box-shadow: 0 3px 10px rgba(224,160,32,.4); }
+  .rankPanel .row .pos { font-size: 22px; min-width: 36px; text-align: center; }
+  .rankPanel .row .name { flex: 1; font-weight: bold; }
+  .rankPanel .row .money { font-weight: bold; color: #c60; }
+  .rankPanel .row .sub { font-size: 10px; color: #666; }
+  .endBtn {
+    width: 100%; padding: 14px; margin-top: 10px;
+    background: linear-gradient(135deg,#5cb85c,#3c903c);
+    color: #fff; font-size: 16px; font-weight: bold;
+    border-radius: 12px; border: none; cursor: pointer;
+    min-height: 52px;
+  }
+  .endBtn.reset { background: linear-gradient(135deg,#7c9cff,#4060d0); }
+
+  #goalDialog { position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 310;
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px; }
+  #goalDialog.hidden { display: none; }
+  .goalPanel {
+    background: linear-gradient(135deg,#fff0f5,#ffe0f0);
+    border-radius: 18px; padding: 22px;
+    width: min(400px, 100%);
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(200,0,80,.4);
+    border: 3px solid #ff7090;
+  }
+  .goalPanel h2 { margin: 0 0 12px; font-size: 22px; color: #d03060; }
+  .goalPanel .goalMsg { font-size: 15px; margin-bottom: 16px;
+    font-weight: bold; color: #333; }
+  .goalPanel .goalBtnRow { display: flex; gap: 8px; justify-content: center; }
+  .goalPanel button {
+    padding: 12px 24px; font-size: 15px; font-weight: bold;
+    border-radius: 10px; border: none; cursor: pointer;
+    min-height: 48px; flex: 1;
+  }
+  .goalPanel .btnYes { background: linear-gradient(135deg,#5cb85c,#3c903c); color: #fff; }
+  .goalPanel .btnNo { background: linear-gradient(135deg,#888,#555); color: #fff; }
+
+  #startScreen {
+    position: fixed; inset: 0;
+    background: linear-gradient(135deg, #7cc4ff 0%, #f0a0e0 50%, #ffd060 100%);
+    z-index: 500; overflow-y: auto;
+    display: flex; justify-content: center; padding: 20px;
+  }
+  #startScreen.hidden { display: none; }
+  .startPanel {
+    background: #fff; border-radius: 20px; padding: 22px;
+    width: min(480px, 100%); height: fit-content; margin: auto 0;
+    box-shadow: 0 12px 40px rgba(0,0,0,.3);
+  }
+  .startPanel h1 { margin: 0 0 4px; font-size: 24px; text-align: center; }
+  .subtitle { color: #666; font-size: 12px; margin: 0 0 16px; text-align: center; }
+  .startSection { margin-bottom: 14px; }
+  .startSection > label { display: block; font-weight: bold;
+    font-size: 13px; margin-bottom: 6px; }
+  .btnGroup { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btnGroup button {
+    flex: 1; min-width: 60px; padding: 8px 10px;
+    background: #eef; color: #223; font-size: 13px;
+    border: 2px solid #ccd; border-radius: 8px;
+    min-height: 42px; cursor: pointer; font-weight: normal;
+  }
+  .btnGroup button.selected {
+    background: linear-gradient(135deg,#7c9cff,#4060d0);
+    color: #fff; border-color: #4060d0; font-weight: bold;
+  }
+  #playerInputs, #cpuInputs { display: flex; flex-direction: column; gap: 8px; }
+  .playerRow { display: flex; gap: 8px; align-items: center;
+    background: #f8f8f8; border-radius: 10px; padding: 8px; }
+  .playerRow .label { font-weight: bold; font-size: 12px; min-width: 76px; }
+  .playerRow .nameInput {
+    flex: 1; padding: 8px 10px;
+    border: 2px solid #ccd; border-radius: 8px;
+    font-size: 13px; min-width: 0; }
+  .playerRow .iconSel { display: flex; gap: 3px; }
+  .playerRow .iconSel button {
+    font-size: 18px; padding: 4px 6px;
+    min-height: 38px; min-width: 38px;
+    background: #eef; border: 2px solid #ccd;
+    border-radius: 8px; cursor: pointer; }
+  .playerRow .iconSel button.selected {
+    background: linear-gradient(135deg,#7c9cff,#4060d0);
+    border-color: #4060d0; }
+  .playerRow .levelSel { display: flex; gap: 3px; flex: 1; }
+  .playerRow .levelSel button {
+    flex: 1; padding: 6px 4px; font-size: 11px;
+    min-height: 38px; background: #eef;
+    border: 2px solid #ccd; border-radius: 8px;
+    cursor: pointer; font-weight: normal; }
+  .playerRow .levelSel button.selected {
+    background: linear-gradient(135deg,#7c9cff,#4060d0);
+    color: #fff; border-color: #4060d0; font-weight: bold; }
+  #startBtn {
+    width: 100%; margin-top: 8px; padding: 15px;
+    background: linear-gradient(135deg,#5cb85c,#3c903c);
+    color: #fff; font-size: 17px; font-weight: bold;
+    border-radius: 12px; border: none; cursor: pointer;
+    min-height: 54px;
+    box-shadow: 0 4px 12px rgba(60,144,60,.4); }
+  #startBtn:hover { transform: translateY(-2px); }
+</style>
+</head>
+<body>
+<div id="hud">
+  <span id="day">1日目</span>
+  <span id="month">1ヶ月目</span>
+  <span id="turnInfo">🎮 <span id="curIcon">🧑</span> <span id="curName">-</span></span>
+  <span id="money">0きゅん</span>
+  <span id="remain">ゴールまで -- マス</span>
+</div>
+<div id="board">
+  <div id="boardInner">
+    <svg id="lines" width="1800" height="1400"></svg>
+  </div>
+</div>
+<div id="log"></div>
+<div id="controls">
+  <button id="rollBtn">🎲 サイコロ</button>
+  <button id="goalReachBtn">🎯 ゴールにいける？</button>
+  <button id="cardBtn">🎴 カードを使う</button>
+  <button id="propBtn">🏘 物件一覧</button>
+  <button id="rankBtn">🏆 順位表</button>
+  <button id="mapToggleBtn">🗺 全体マップ</button>
+  <button id="muteBtn">🔊 音ON</button>
+  <button id="saveBtn">💾</button>
+  <button id="loadBtn">📂</button>
+  <button id="debugBtn">🎴テスト</button>
+</div>
+
+<div id="handPanel" class="hidden">
+  <div class="handHeader">
+    <span>手札 <span id="handCount">0</span>/10</span>
+    <button id="closeHand">閉じる</button>
+  </div>
+  <div id="handList"></div>
+</div>
+
+<div id="propDialog" class="hidden">
+  <div class="propHeader">
+    <span class="name" id="propStationName">物件</span>
+    <button id="closePropDialog">閉じる</button>
+  </div>
+  <div id="propList"></div>
+</div>
+
+<div id="debtDialog" class="hidden">
+  <div class="debtPanel">
+    <h2>💸 借金返済</h2>
+    <div class="debtInfo">
+      借金額
+      <span class="debtAmount" id="debtAmount">0きゅん</span>
+    </div>
+    <div class="debtMsg" id="debtMsg">
+      物件を売却して借金を返済してください
+    </div>
+    <div id="debtList"></div>
+    <div class="debtFooter" id="debtFooter"></div>
+  </div>
+</div>
+
+<div id="settleDialog" class="hidden">
+  <div class="settlePanel">
+    <h2 id="settleTitle">💰 決算</h2>
+    <div class="subtitle2" id="settleSubtitle">物件収入の集計</div>
+    <div id="settleIncome"></div>
+    <div class="sectionTitle" style="font-weight:bold;font-size:13px;color:#333;margin:12px 0 6px;padding:4px 8px;background:#eef;border-radius:6px;">【現在の順位】</div>
+    <div id="settleRank"></div>
+    <button class="settleBtn" id="settleOkBtn">OK</button>
+  </div>
+</div>
+
+<div id="rankDialog" class="hidden">
+  <div class="rankPanel">
+    <h2>🏆 順位表</h2>
+    <div class="date" id="rankDate">-</div>
+    <div id="rankList"></div>
+    <button class="endBtn" id="rankCloseBtn">閉じる</button>
+  </div>
+</div>
+
+<div id="endDialog" class="hidden">
+  <div class="rankPanel">
+    <h2 id="endTitle">🎉 ゲーム終了！ 🎉</h2>
+    <div class="date" id="endDate">-</div>
+    <div id="endList"></div>
+    <button class="endBtn reset" id="restartBtn">🔄 もう一度遊ぶ</button>
+  </div>
+</div>
+
+<div id="goalDialog" class="hidden">
+  <div class="goalPanel">
+    <h2 id="goalDialogTitle">🎯 ゴール判定</h2>
+    <div class="goalMsg" id="goalDialogMsg">-</div>
+    <div class="goalBtnRow" id="goalDialogBtns"></div>
+  </div>
+</div>
+
+<div id="startScreen">
+  <div class="startPanel">
+    <h1>🚃 埼玉散歩日和り</h1>
+    <p class="subtitle">埼玉をめぐって「きゅん」を稼ごう！</p>
+
+    <div class="startSection">
+      <label>👥 プレイヤー人数（人間）</label>
+      <div class="btnGroup" id="humanCountGroup"></div>
+    </div>
+
+    <div class="startSection">
+      <label>🤖 CPU追加</label>
+      <div class="btnGroup" id="cpuCountGroup"></div>
+    </div>
+
+    <div class="startSection">
+      <label>📅 プレイ期間</label>
+      <div class="btnGroup" id="monthsGroup"></div>
+    </div>
+
+    <div class="startSection">
+      <label>👤 プレイヤー設定</label>
+      <div id="playerInputs"></div>
+    </div>
+
+    <div class="startSection" id="cpuSection">
+      <label>🤖 CPU設定</label>
+      <div id="cpuInputs"></div>
+    </div>
+
+    <button id="startBtn">🎮 ゲームスタート</button>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="cards.js"></script>
+<script src="properties.js"></script>
+<script src="events.js"></script>
+<script src="sound.js"></script>
+<script src="cpu.js"></script>
+<script src="main.js"></script>
+<script src="start.js"></script>
+
+<script>
+// ===== Service Worker 登録 =====
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js")
+      .then((reg) => {
+        console.log("✅ Service Worker 登録成功:", reg.scope);
+      })
+      .catch((err) => {
+        console.warn("⚠️ Service Worker 登録失敗:", err.message);
+      });
+  });
+}
+</script>
+</body>
+</html>

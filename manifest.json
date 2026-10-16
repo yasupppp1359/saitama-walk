@@ -1,0 +1,20 @@
+{
+  "name": "埼玉散歩日和り",
+  "short_name": "埼玉散歩",
+  "description": "埼玉をめぐってきゅんを稼ぐボードゲーム",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f5f0",
+  "theme_color": "#223344",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
