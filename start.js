@@ -194,6 +194,9 @@ function refreshAll() {
 
 // ===== ゲームスタートボタン =====
 document.getElementById("startBtn").onclick = () => {
+  // ★ 新規開始時にオートセーブをクリア
+  localStorage.removeItem("saitama_auto");
+
   for (let i = 0; i < startConfig.humanPlayers.length; i++) {
     if (!startConfig.humanPlayers[i].name ||
         startConfig.humanPlayers[i].name.trim() === "") {
@@ -209,7 +212,7 @@ document.getElementById("startBtn").onclick = () => {
       cpuLevels: [...startConfig.cpuLevels],
     });
   } else {
-    alert("startGame が見つかりません。main.js の最後に window.startGame = startGame; を追加してください");
+    alert("startGame が見つかりません");
   }
 };
 
