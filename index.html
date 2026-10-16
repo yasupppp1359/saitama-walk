@@ -444,7 +444,6 @@
   .goalPanel .btnYes { background: linear-gradient(135deg,#5cb85c,#3c903c); color: #fff; }
   .goalPanel .btnNo { background: linear-gradient(135deg,#888,#555); color: #fff; }
 
-  /* ===== 再開ダイアログ ===== */
   #resumeDialog {
     position: fixed; inset: 0;
     background: linear-gradient(135deg, #7cc4ff 0%, #f0a0e0 50%, #ffd060 100%);
@@ -696,26 +695,27 @@
   </div>
 </div>
 
-<script src="data.js"></script>
-<script src="cards.js"></script>
-<script src="properties.js"></script>
-<script src="events.js"></script>
-<script src="sound.js"></script>
-<script src="cpu.js"></script>
-<script src="main.js"></script>
-<script src="start.js"></script>
+<script src="data.js?v=1"></script>
+<script src="cards.js?v=1"></script>
+<script src="properties.js?v=1"></script>
+<script src="events.js?v=1"></script>
+<script src="sound.js?v=1"></script>
+<script src="cpu.js?v=1"></script>
+<script src="main.js?v=1"></script>
+<script src="start.js?v=1"></script>
 
 <script>
+// ===== 古いService Workerを完全削除 =====
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js")
-      .then((reg) => {
-        console.log("✅ Service Worker 登録成功:", reg.scope);
-      })
-      .catch((err) => {
-        console.warn("⚠️ Service Worker 登録失敗:", err.message);
-      });
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((reg) => reg.unregister());
+    console.log("✅ 古いService Workerを削除しました");
   });
+  if ("caches" in window) {
+    caches.keys().then((names) => {
+      names.forEach((name) => caches.delete(name));
+    });
+  }
 }
 </script>
 </body>
