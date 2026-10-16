@@ -1,5 +1,5 @@
 // ========================================
-// main.js - ゲームロジック（ピンチズーム対応・最終版）
+// main.js - ゲームロジック（完全版）
 // ========================================
 
 window.onerror = (msg, url, line) => {
@@ -376,7 +376,6 @@ function setupPan() {
   let pinchStartDist = 0;
   let pinchStartZoom = 1;
 
-  // ===== マウス =====
   target.addEventListener("mousedown", (e) => {
     if (isFullMap) return;
     if (e.target.closest(".cell") && e.target.classList.contains("highlight")) return;
@@ -391,7 +390,6 @@ function setupPan() {
     endPan();
   });
 
-  // マウスホイールでズーム
   target.addEventListener("wheel", (e) => {
     if (isFullMap) return;
     e.preventDefault();
@@ -400,7 +398,6 @@ function setupPan() {
     applyCamera();
   }, { passive: false });
 
-  // ===== タッチ =====
   target.addEventListener("touchstart", (e) => {
     if (isFullMap) return;
     if (e.touches.length === 2) {
@@ -1183,12 +1180,13 @@ function checkGoalReach() {
   if (!isMoving || remainingSteps <= 0) return;
 
   const reachable = findReachable(player.pos, remainingSteps);
-  const canReach = reachable.has(GOAL_ID);
+  const goalInfo = reachable.get(GOAL_ID);
+  const canReach = goalInfo && goalInfo.dist === remainingSteps;
 
   if (!canReach) {
     goalDialog.classList.remove("hidden");
     document.getElementById("goalDialogTitle").textContent = "🎯 ゴール判定";
-    document.getElementById("goalDialogMsg").textContent = "❌ ゴールには行けません";
+    document.getElementById("goalDialogMsg").textContent = "❌ ピッタリ止まれないのでゴールできません";
     document.getElementById("goalDialogBtns").innerHTML =
       `<button class="btnNo" id="goalCloseBtn">閉じる</button>`;
     document.getElementById("goalCloseBtn").onclick = () => {
@@ -1198,11 +1196,11 @@ function checkGoalReach() {
     return;
   }
 
-  const dist = reachable.get(GOAL_ID).dist;
+  const dist = goalInfo.dist;
   goalDialog.classList.remove("hidden");
-  document.getElementById("goalDialogTitle").textContent = "🎯 ゴールにいける！";
+  document.getElementById("goalDialogTitle").textContent = "🎯 ゴールにピッタリ止まれる！";
   document.getElementById("goalDialogMsg").textContent =
-    `${dist}マスでゴールできます。行きますか？`;
+    `${dist}マスでピッタリ止まれます。行きますか？`;
   document.getElementById("goalDialogBtns").innerHTML =
     `<button class="btnYes" id="goalYesBtn">はい</button>
      <button class="btnNo" id="goalNoBtn">いいえ</button>`;
