@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
 <title>埼玉散歩日和り</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#223344">
@@ -751,7 +751,6 @@
 <script src="start.js?v=2"></script>
 
 <script>
-// ===== 古いService Workerを完全削除 =====
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.getRegistrations().then((regs) => {
     regs.forEach((reg) => reg.unregister());
