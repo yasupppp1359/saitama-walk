@@ -1,5 +1,5 @@
 // ========================================
-// main.js - ゲームロジック（修正完全版）
+// main.js - ゲームロジック（完全版）
 // ========================================
 
 window.onerror = (msg, url, line) => {
@@ -142,6 +142,7 @@ let turnPath = [];
 let currentPlayerIndex = 0;
 let pendingSettlement = false;
 let pendingSettlementCallback = null;
+let pendingNextTurn = false;
 const poos = new Set();
 
 let panOffsetX = 0;
@@ -188,7 +189,7 @@ function log(msg) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-// ===== オートセーブ（バージョン2） =====
+// ===== オートセーブ =====
 function autoSave() {
   if (!players || players.length === 0) return;
   try {
@@ -217,7 +218,6 @@ function loadAutoSave() {
   if (!raw) return false;
   try {
     const data = JSON.parse(raw);
-    // バージョンチェック：古いセーブは無効化
     if (!data.version || data.version < 2) {
       console.log("古いセーブデータのため無効化");
       localStorage.removeItem("saitama_auto");
@@ -254,7 +254,6 @@ function loadAutoSave() {
   }
 }
 
-// ===== ゴールバナー（堅牢版） =====
 function updateGoalBanner() {
   if (!goalBannerName) return;
   let goalCell = CELL_BY_ID[GOAL_ID];
@@ -783,16 +782,20 @@ function applyCellEffect(cellId) {
     log("🟥 " + player.name + " −" + ky(a));
   } else if (c.kind === "goal") {
     playSound("goal");
-    log("🚩 " + player.name + " が " + c.name + " に到着！");
+    const arrivedPlayerName = player.name;
+    const arrivedGoalName = c.name;
+    log("🚩 " + arrivedPlayerName + " が " + arrivedGoalName + " に到着！");
     const basePrize = 50000000 * month;
     let prize = basePrize;
+    let happyBonus = false;
     if (player.buffs.happy) {
       prize *= 2;
       player.buffs.happy = false;
+      happyBonus = true;
       log("😊 ハッピー発動！ 賞金2倍");
     }
     player.money += prize;
-    log("🏆 " + player.name + " 賞金 +" + ky(prize));
+    log("🏆 " + arrivedPlayerName + " 賞金 +" + ky(prize));
 
     for (const p of players) {
       if (p === player) continue;
@@ -804,15 +807,19 @@ function applyCellEffect(cellId) {
     }
 
     const goals = MAP.filter(x => x.kind === "goal" && x.id !== GOAL_ID);
+    let nextGoalName = "";
     if (goals.length > 0) {
       CELL_BY_ID[GOAL_ID].isGoal = false;
       const newGoal = goals[Math.floor(Math.random() * goals.length)];
       newGoal.isGoal = true;
       GOAL_ID = newGoal.id;
-      log("🎯 次のゴール：" + newGoal.name);
+      nextGoalName = newGoal.name;
+      log("🎯 次のゴール：" + nextGoalName);
       updateGoalBanner();
       drawBoard();
     }
+
+    showGoalArrivalPopup(arrivedPlayerName, arrivedGoalName, prize, happyBonus, nextGoalName);
   } else if (c.kind === "prop") {
     if (player.isCPU) {
       cpuBuyProperty(cellId);
@@ -821,6 +828,40 @@ function applyCellEffect(cellId) {
     }
   }
   updateHUD();
+}
+
+function showGoalArrivalPopup(arrivedPlayer, goalName, prize, happyBonus, nextGoal) {
+  document.getElementById("arrivalName").textContent = arrivedPlayer;
+  document.getElementById("arrivalGoal").textContent = goalName;
+  document.getElementById("arrivalPrize").textContent =
+    "🏆 賞金 +" + ky(prize) + (happyBonus ? "（ハッピー2倍！）" : "");
+  document.getElementById("arrivalNext").innerHTML = nextGoal
+    ? '🎯 次の目的地：<strong>' + nextGoal + '</strong>'
+    : '🎮 ゲーム終了！';
+
+  const dialog = document.getElementById("goalArrivalDialog");
+  dialog.classList.remove("hidden");
+
+  document.getElementById("goalArrivalOkBtn").onclick = () => {
+    dialog.classList.add("hidden");
+    playSound("pop");
+    if (pendingNextTurn) {
+      pendingNextTurn = false;
+      checkPendingDialogsOrProceed();
+    }
+  };
+}
+
+function checkPendingDialogsOrProceed() {
+  const propDlg = document.getElementById("propDialog");
+  const arrivalDlg = document.getElementById("goalArrivalDialog");
+
+  if ((propDlg && !propDlg.classList.contains("hidden")) ||
+      (arrivalDlg && !arrivalDlg.classList.contains("hidden"))) {
+    pendingNextTurn = true;
+    return;
+  }
+  proceedToNextPlayer();
 }
 
 function cpuBuyProperty(cellId) {
@@ -899,7 +940,13 @@ function openPropDialog(cellId) {
   propDialog.classList.remove("hidden");
 }
 
-function closePropDialog() { propDialog.classList.add("hidden"); }
+function closePropDialog() {
+  propDialog.classList.add("hidden");
+  if (pendingNextTurn) {
+    pendingNextTurn = false;
+    checkPendingDialogsOrProceed();
+  }
+}
 
 function openPropertyList() {
   const owned = ALL_PROPS.filter(p => p.owner === player.id);
@@ -923,12 +970,11 @@ function endMove() {
   clearHighlights();
   goalReachBtn.classList.remove("show");
   log("── " + player.name + " のターン終了 ──");
-
   autoSave();
 
   if (!player.isCPU && player.money < 0) {
     debtResolveCallback = () => {
-      proceedToNextPlayer();
+      checkPendingDialogsOrProceed();
     };
     openDebtDialog();
     return;
@@ -938,7 +984,7 @@ function endMove() {
     autoSellForCPU();
   }
 
-  proceedToNextPlayer();
+  checkPendingDialogsOrProceed();
 }
 
 function proceedToNextPlayer() {
@@ -1649,10 +1695,8 @@ function startGame(config) {
     audioCtx.resume();
   }
 
-  // 新規開始時にオートセーブをクリア
   localStorage.removeItem("saitama_auto");
 
-  // GOAL_IDを確実に初期化
   for (const c of MAP) c.isGoal = false;
   GOAL_ID = stationIdMap["fukaya"];
   CELL_BY_ID[GOAL_ID].isGoal = true;
@@ -1705,6 +1749,7 @@ function startGame(config) {
   isFullMap = false;
   pendingSettlement = false;
   pendingSettlementCallback = null;
+  pendingNextTurn = false;
   panOffsetX = 0;
   panOffsetY = 0;
   if (typeof globalSeal !== "undefined") globalSeal = 0;
@@ -1725,10 +1770,8 @@ function startGame(config) {
 
 window.startGame = startGame;
 
-// ===== パン操作の初期化 =====
 setupPan();
 
-// ===== 自動ロード判定 =====
 (function checkAutoLoad() {
   const raw = localStorage.getItem("saitama_auto");
   if (!raw) {
