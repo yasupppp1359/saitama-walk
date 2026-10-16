@@ -1,5 +1,5 @@
 // ========================================
-// main.js - ゲームロジック（オートセーブ対応）
+// main.js - ゲームロジック（オートセーブ・ゴール修正版）
 // ========================================
 
 window.onerror = (msg, url, line) => {
@@ -236,6 +236,9 @@ function loadAutoSave() {
     if (typeof globalSeal !== "undefined") globalSeal = data.globalSeal || 0;
     for (const c of MAP) c.isGoal = false;
     GOAL_ID = data.GOAL_ID;
+    if (!CELL_BY_ID[GOAL_ID]) {
+      GOAL_ID = stationIdMap["fukaya"];
+    }
     CELL_BY_ID[GOAL_ID].isGoal = true;
     return true;
   } catch (e) {
@@ -244,12 +247,19 @@ function loadAutoSave() {
   }
 }
 
+// ===== ゴールバナー（堅牢版） =====
 function updateGoalBanner() {
   if (!goalBannerName) return;
-  const goalCell = CELL_BY_ID[GOAL_ID];
-  if (goalCell) {
-    goalBannerName.textContent = goalCell.name || "ゴール";
+  let goalCell = CELL_BY_ID[GOAL_ID];
+  if (!goalCell || !goalCell.name) {
+    const anyGoal = MAP.find(c => c.kind === "goal");
+    if (anyGoal) {
+      GOAL_ID = anyGoal.id;
+      anyGoal.isGoal = true;
+      goalCell = anyGoal;
+    }
   }
+  goalBannerName.textContent = (goalCell && goalCell.name) ? goalCell.name : "?";
 }
 
 function drawBoard() {
@@ -324,6 +334,7 @@ function drawAllPlayers() {
     el.textContent = p.icon;
     el.dataset.playerId = p.id;
     const cell = CELL_BY_ID[p.pos];
+    if (!cell) continue;
     el.style.left = cell.x + "px";
     el.style.top  = cell.y + "px";
     el.style.zIndex = 50 + p.id;
@@ -336,6 +347,8 @@ function drawPlayer() { drawAllPlayers(); }
 
 function applyCamera() {
   if (!player) return;
+  const cell = CELL_BY_ID[player.pos];
+  if (!cell) return;
   if (isFullMap) {
     const scale = Math.min(boardOuter.clientWidth / BOARD_W, boardOuter.clientHeight / BOARD_H);
     const sw = BOARD_W * scale, sh = BOARD_H * scale;
@@ -344,7 +357,6 @@ function applyCamera() {
     boardEl.style.transform = `translate(${ox}px, ${oy}px) scale(${scale})`;
   } else {
     const zoom = 0.9;
-    const cell = CELL_BY_ID[player.pos];
     const cx = boardOuter.clientWidth / 2;
     const cy = boardOuter.clientHeight / 2;
     const ox = cx - cell.x * zoom + panOffsetX;
@@ -895,7 +907,6 @@ function endMove() {
   goalReachBtn.classList.remove("show");
   log("── " + player.name + " のターン終了 ──");
 
-  // ★ オートセーブ
   autoSave();
 
   if (!player.isCPU && player.money < 0) {
@@ -1210,7 +1221,6 @@ function endGame() {
   playSound("victory");
   log("🎉 ゲーム終了！");
 
-  // 終了時はオートセーブをクリア
   localStorage.removeItem("saitama_auto");
 
   document.getElementById("endDate").textContent =
@@ -1561,19 +1571,11 @@ if (muteBtn) {
 }
 
 document.getElementById("saveBtn").onclick = () => {
-  const data = {
-    players: players.map(p => ({ ...p })),
-    currentPlayerIndex,
-    day, month, GOAL_ID, maxMonth,
-    poos: [...poos],
-    props: ALL_PROPS.map(p => ({ id:p.id, owner:p.owner, price:p.price })),
-    globalSeal: (typeof globalSeal !== "undefined" ? globalSeal : 0),
-  };
-  localStorage.setItem("saitama_save", JSON.stringify(data));
+  autoSave();
   log("💾 セーブしました");
 };
 document.getElementById("loadBtn").onclick = () => {
-  const raw = localStorage.getItem("saitama_save");
+  const raw = localStorage.getItem("saitama_auto");
   if (!raw) { log("セーブデータがありません"); return; }
   const data = JSON.parse(raw);
   if (data.players) {
@@ -1597,6 +1599,7 @@ document.getElementById("loadBtn").onclick = () => {
   if (typeof globalSeal !== "undefined") globalSeal = data.globalSeal || 0;
   for (const c of MAP) c.isGoal = false;
   GOAL_ID = data.GOAL_ID;
+  if (!CELL_BY_ID[GOAL_ID]) GOAL_ID = stationIdMap["fukaya"];
   CELL_BY_ID[GOAL_ID].isGoal = true;
   document.getElementById("startScreen").classList.add("hidden");
   drawBoard();
@@ -1630,6 +1633,11 @@ function startGame(config) {
 
   // 新規開始時にオートセーブをクリア
   localStorage.removeItem("saitama_auto");
+
+  // ★ GOAL_IDを確実に初期化
+  for (const c of MAP) c.isGoal = false;
+  GOAL_ID = stationIdMap["fukaya"];
+  CELL_BY_ID[GOAL_ID].isGoal = true;
 
   players = [];
   currentPlayerIndex = 0;
@@ -1689,7 +1697,6 @@ function startGame(config) {
   log("🎮 ゲームスタート！");
   log("プレイヤー：" + players.map(p => p.name).join(" / "));
   log("プレイ期間：" + maxMonth + "ヶ月");
-  log("🚁 ヘリポート / ⭐ ナイスカード / 🎴 カード売り場");
 
   drawBoard();
   updateGoalBanner();
@@ -1703,21 +1710,24 @@ window.startGame = startGame;
 // ===== パン操作の初期化 =====
 setupPan();
 
-// ===== 自動ロード =====
+// ===== 自動ロード（最後に実行） =====
 (function tryAutoLoad() {
-  if (loadAutoSave()) {
-    document.getElementById("startScreen").classList.add("hidden");
-    log("📂 前回の続きから再開しました（" + month + "ヶ月目 " + day + "日）");
-    drawBoard();
-    updateGoalBanner();
-    applyCamera();
-    startBGM();
-    setTimeout(() => {
-      beginTurn(player);
-    }, 100);
+  try {
+    if (loadAutoSave()) {
+      document.getElementById("startScreen").classList.add("hidden");
+      drawBoard();
+      updateGoalBanner();
+      applyCamera();
+      startBGM();
+      log("📂 前回の続きから再開しました（" + month + "ヶ月目 " + day + "日）");
+      setTimeout(() => {
+        beginTurn(player);
+      }, 150);
+      return;
+    }
+  } catch (e) {
+    console.warn("Auto-load error:", e);
   }
+  log("🚃 埼玉散歩日和り へようこそ！");
+  log("🎮 設定を選んで「ゲームスタート」を押してください");
 })();
-
-log("🚃 埼玉散歩日和り へようこそ！");
-log("🎮 設定を選んで「ゲームスタート」を押してください");
-log("👆 盤面を指でドラッグすると先を見られます");
