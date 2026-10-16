@@ -2,7 +2,7 @@
 // service-worker.js - ネット優先（更新が即反映）
 // ========================================
 
-const CACHE_NAME = "saitama-walk-v10";
+const CACHE_NAME = "saitama-walk-v11";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
