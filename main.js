@@ -1,5 +1,5 @@
 // ========================================
-// main.js - ゲームロジック（完全版）
+// main.js - ゲームロジック（2倍スケール・効果ポップ対応）
 // ========================================
 
 window.onerror = (msg, url, line) => {
@@ -75,7 +75,7 @@ function buildMap() {
     const A = stMap[aId], B = stMap[bId];
     if (!A || !B) continue;
     const dist = Math.hypot(A.x - B.x, A.y - B.y);
-    const n = dist < 300 ? 3 : dist < 450 ? 4 : dist < 600 ? 5 : dist < 750 ? 6 : 7;
+    const n = dist < 400 ? 3 : dist < 600 ? 4 : dist < 800 ? 5 : dist < 1000 ? 6 : 7;
     let prevId = stationIdMap[aId];
     for (let i = 1; i <= n; i++) {
       const t = i / (n + 1);
@@ -166,9 +166,15 @@ let pendingSettlementCallback = null;
 let pendingNextTurn = false;
 let hasRolledThisTurn = false;
 let isShowingGoalPopup = false;
+let isShowingEffectPopup = false;
 const poos = new Set();
 
-let userZoom = 0.9;
+// 効果ポップアップ用
+let collectingEffects = false;
+let collectedEffects = [];
+let effectOkCallback = null;
+
+let userZoom = 0.6;
 let panOffsetX = 0;
 let panOffsetY = 0;
 let isPanning = false;
@@ -202,6 +208,9 @@ const goalDialog = document.getElementById("goalDialog");
 const goalReachBtn = document.getElementById("goalReachBtn");
 const goalBannerName = document.getElementById("goalBannerName");
 const panHint = document.getElementById("panHint");
+const effectDialog = document.getElementById("effectDialog");
+const effectList = document.getElementById("effectList");
+const effectOkBtn = document.getElementById("effectOkBtn");
 
 function log(msg) {
   const p = document.createElement("div");
@@ -211,6 +220,45 @@ function log(msg) {
     logEl.removeChild(logEl.firstChild);
   }
   logEl.scrollTop = logEl.scrollHeight;
+  if (collectingEffects) {
+    collectedEffects.push(msg);
+  }
+}
+
+// ===== 効果ポップアップ =====
+function showEffectPopup(callback) {
+  if (collectedEffects.length === 0) {
+    if (callback) callback();
+    return;
+  }
+
+  effectList.innerHTML = "";
+  for (const msg of collectedEffects) {
+    const item = document.createElement("div");
+    item.className = "effect-item";
+    item.textContent = msg;
+    effectList.appendChild(item);
+  }
+
+  effectDialog.classList.remove("hidden");
+  isShowingEffectPopup = true;
+
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    effectDialog.classList.add("hidden");
+    isShowingEffectPopup = false;
+    if (callback) callback();
+  };
+
+  if (player && player.isCPU) {
+    effectOkBtn.style.display = "none";
+    setTimeout(close, 800);
+  } else {
+    effectOkBtn.style.display = "";
+    effectOkBtn.onclick = close;
+  }
 }
 
 function autoSave() {
@@ -242,7 +290,6 @@ function loadAutoSave() {
   try {
     const data = JSON.parse(raw);
     if (!data.version || data.version < 2) {
-      console.log("古いセーブデータのため無効化");
       localStorage.removeItem("saitama_auto");
       return false;
     }
@@ -420,7 +467,7 @@ function setupPan() {
     if (isFullMap) return;
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    userZoom = Math.max(0.3, Math.min(3.0, userZoom * delta));
+    userZoom = Math.max(0.2, Math.min(3.0, userZoom * delta));
     applyCamera();
   }, { passive: false });
 
@@ -446,7 +493,7 @@ function setupPan() {
       const t2 = e.touches[1];
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       if (pinchStartDist > 0) {
-        userZoom = Math.max(0.3, Math.min(3.0, pinchStartZoom * (dist / pinchStartDist)));
+        userZoom = Math.max(0.2, Math.min(3.0, pinchStartZoom * (dist / pinchStartDist)));
         applyCamera();
       }
       return;
@@ -707,6 +754,17 @@ function showMoveTargets() {
   }
 }
 
+function continueAfterMove() {
+  if (isShowingGoalPopup) return;
+  if (isShowingEffectPopup) return;
+  if (remainingSteps <= 0) {
+    endMove();
+    return;
+  }
+  updateHUD();
+  showMoveTargets();
+}
+
 function autoWalkTo(targetId, reachable) {
   clearHighlights();
   const path = [];
@@ -736,17 +794,11 @@ function autoWalkTo(targetId, reachable) {
   }
 
   if (!lastWasBacktrack && path.length > 0) {
-    applyCellEffect(player.pos);
+    const popupShown = applyCellEffect(player.pos);
+    if (popupShown) return;
   }
 
-  if (isShowingGoalPopup) return;
-
-  if (remainingSteps <= 0) {
-    endMove();
-    return;
-  }
-  updateHUD();
-  showMoveTargets();
+  continueAfterMove();
 }
 
 function clearHighlights() {
@@ -759,15 +811,25 @@ function clearHighlights() {
 
 function applyCellEffect(cellId) {
   const c = CELL_BY_ID[cellId];
-  if (!c) return;
+  if (!c) return false;
 
+  collectingEffects = true;
+  collectedEffects = [];
+
+  // Event
   if (c.type === CELL.EVENT) {
     playSound("event");
     triggerRandomEvent();
+    collectingEffects = false;
     updateHUD();
-    return;
+    if (collectedEffects.length > 0) {
+      showEffectPopup(continueAfterMove);
+      return true;
+    }
+    return false;
   }
 
+  // Heli
   if (c.type === CELL.HELI) {
     playSound("warp");
     const helis = MAP.filter(x => x.type === CELL.HELI && x.id !== cellId);
@@ -780,10 +842,16 @@ function applyCellEffect(cellId) {
     } else {
       log("🚁 ヘリポート（他に行き先なし）");
     }
+    collectingEffects = false;
     updateHUD();
-    return;
+    if (collectedEffects.length > 0) {
+      showEffectPopup(continueAfterMove);
+      return true;
+    }
+    return false;
   }
 
+  // Nice
   if (c.type === CELL.NICE) {
     playSound("card");
     const nicePool = ["kakekko","dash","spacia","shirakobato","step10","step8","step6","renchanDash","unWo"];
@@ -794,10 +862,16 @@ function applyCellEffect(cellId) {
     } else {
       log("⭐ 手札一杯でナイスカード入手できず");
     }
+    collectingEffects = false;
     updateHUD();
-    return;
+    if (collectedEffects.length > 0) {
+      showEffectPopup(continueAfterMove);
+      return true;
+    }
+    return false;
   }
 
+  // Shop
   if (c.type === CELL.SHOP) {
     playSound("coin");
     const price = 5000000;
@@ -808,18 +882,30 @@ function applyCellEffect(cellId) {
       player.cards.push(cid);
       log("🎴 " + player.name + " がカード売り場で " + CARDS[cid].name + " を購入 (-" + ky(price) + ")");
     } else if (player.money < price) {
-      log("🎴 カード売り場（資金不足: " + ky(price) + " 必要）");
+      log("🎴 カード売り場（資金不足）");
     } else {
       log("🎴 カード売り場（手札一杯）");
     }
+    collectingEffects = false;
     updateHUD();
-    return;
+    if (collectedEffects.length > 0) {
+      showEffectPopup(continueAfterMove);
+      return true;
+    }
+    return false;
   }
 
   const isYellowed = player.buffs.yellow && (c.type === CELL.PLUS || c.type === CELL.MINUS);
 
   if (isYellowed || c.type === CELL.CARD) {
     giveRandomCard();
+    collectingEffects = false;
+    updateHUD();
+    if (collectedEffects.length > 0) {
+      showEffectPopup(continueAfterMove);
+      return true;
+    }
+    return false;
   } else if (c.type === CELL.PLUS) {
     playSound("coin");
     const mult = getInflationMultiplier();
@@ -835,6 +921,13 @@ function applyCellEffect(cellId) {
         log("🤲 " + p.name + " おすそ分け +" + ky(a));
       }
     }
+    collectingEffects = false;
+    updateHUD();
+    if (collectedEffects.length > 0) {
+      showEffectPopup(continueAfterMove);
+      return true;
+    }
+    return false;
   } else if (c.type === CELL.MINUS) {
     playSound("buzzer");
     const mult = getInflationMultiplier();
@@ -842,6 +935,13 @@ function applyCellEffect(cellId) {
     const a = Math.floor(base * mult);
     player.money -= a;
     log("🟥 " + player.name + " −" + ky(a));
+    collectingEffects = false;
+    updateHUD();
+    if (collectedEffects.length > 0) {
+      showEffectPopup(continueAfterMove);
+      return true;
+    }
+    return false;
   } else if (c.id === GOAL_ID) {
     playSound("goal");
     const arrivedPlayerName = player.name;
@@ -882,44 +982,36 @@ function applyCellEffect(cellId) {
       drawBoard();
     }
 
+    collectingEffects = false;
+    updateHUD();
     isShowingGoalPopup = true;
     showGoalArrivalPopup(arrivedPlayerName, arrivedGoalName, prize, happyBonus, nextGoalName, arrivedCellId);
+    return true;
   } else if (c.kind === "goal" || c.kind === "prop") {
+    collectingEffects = false;
     if (player.isCPU) {
       cpuBuyProperty(cellId);
+      continueAfterMove();
+      return false;
     } else {
       const props = getPropsAtStation(cellId);
       if (props.length > 0) {
         openPropDialog(cellId);
+        return true;
       } else {
         log("🏘 " + (c.name || "この駅") + " には物件がありません");
+        continueAfterMove();
+        return false;
       }
     }
   }
-  updateHUD();
+
+  collectingEffects = false;
+  return false;
 }
 
 function showGoalArrivalPopup(arrivedPlayer, goalName, prize, happyBonus, nextGoal, goalCellId) {
-  let dialog = document.getElementById("goalArrivalDialog");
-
-  if (!dialog) {
-    dialog = document.createElement("div");
-    dialog.id = "goalArrivalDialog";
-    dialog.innerHTML = `
-      <div class="goalArrivalPanel">
-        <h2>🎉 目的地に到着！ 🎉</h2>
-        <p class="arrivalMsg"><span class="arrivalName" id="arrivalName">-</span> が</p>
-        <p class="arrivalMsg"><span class="arrivalName" id="arrivalGoal">-</span> に到着！</p>
-        <p class="arrivalPrize" id="arrivalPrize">-</p>
-        <p class="arrivalNext" id="arrivalNext">-</p>
-        <button class="arrivalOkBtn" id="goalArrivalOkBtn">OK</button>
-      </div>
-    `;
-    dialog.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;justify-content:center;align-items:center;padding:16px;";
-    const panel = dialog.querySelector(".goalArrivalPanel");
-    panel.style.cssText = "background:linear-gradient(135deg,#fff0ff,#ffe0f5);border-radius:20px;padding:24px;width:min(420px,100%);text-align:center;box-shadow:0 12px 40px rgba(200,0,150,.5);border:3px solid #f080f0;";
-    document.body.appendChild(dialog);
-  }
+  const dialog = document.getElementById("goalArrivalDialog");
 
   const nameEl = document.getElementById("arrivalName");
   const goalEl = document.getElementById("arrivalGoal");
@@ -956,18 +1048,7 @@ function showGoalArrivalPopup(arrivedPlayer, goalName, prize, happyBonus, nextGo
           console.warn("Property dialog error:", e);
         }
 
-        if (remainingSteps > 0 && turnInProgress && isMoving) {
-          updateHUD();
-          showMoveTargets();
-          return;
-        }
-
-        if (pendingNextTurn) {
-          pendingNextTurn = false;
-          checkPendingDialogsOrProceed();
-        } else {
-          endMove();
-        }
+        continueAfterMove();
       }, 120);
     };
   }
@@ -976,9 +1057,11 @@ function showGoalArrivalPopup(arrivedPlayer, goalName, prize, happyBonus, nextGo
 function checkPendingDialogsOrProceed() {
   const propDlg = document.getElementById("propDialog");
   const arrivalDlg = document.getElementById("goalArrivalDialog");
+  const effDlg = document.getElementById("effectDialog");
 
   if ((propDlg && !propDlg.classList.contains("hidden")) ||
-      (arrivalDlg && !arrivalDlg.classList.contains("hidden"))) {
+      (arrivalDlg && !arrivalDlg.classList.contains("hidden")) ||
+      (effDlg && !effDlg.classList.contains("hidden"))) {
     pendingNextTurn = true;
     return;
   }
@@ -1066,6 +1149,10 @@ function closePropDialog() {
   if (pendingNextTurn) {
     pendingNextTurn = false;
     checkPendingDialogsOrProceed();
+  } else if (turnInProgress && isMoving) {
+    continueAfterMove();
+  } else {
+    continueAfterMove();
   }
 }
 
@@ -1162,6 +1249,7 @@ function beginTurn(p) {
   applyPlayerBuffs(p);
   hasRolledThisTurn = false;
   isShowingGoalPopup = false;
+  isShowingEffectPopup = false;
 
   thisTurn = { diceCount: 1 };
   if (p.buffs.renchanKakekko) thisTurn.diceCount = 2;
@@ -1280,12 +1368,6 @@ function checkGoalReach() {
       applyCamera();
     }
     applyCellEffect(player.pos);
-    if (remainingSteps <= 0) {
-      endMove();
-    } else {
-      updateHUD();
-      showMoveTargets();
-    }
   };
 
   document.getElementById("goalNoBtn").onclick = () => {
@@ -1877,9 +1959,10 @@ function startGame(config) {
   pendingNextTurn = false;
   hasRolledThisTurn = false;
   isShowingGoalPopup = false;
+  isShowingEffectPopup = false;
   panOffsetX = 0;
   panOffsetY = 0;
-  userZoom = 0.9;
+  userZoom = 0.6;
   if (typeof globalSeal !== "undefined") globalSeal = 0;
 
   document.getElementById("startScreen").classList.add("hidden");
@@ -1910,7 +1993,6 @@ setupPan();
   try {
     const data = JSON.parse(raw);
     if (!data.version || data.version < 2) {
-      console.log("古いセーブデータのため無効化");
       localStorage.removeItem("saitama_auto");
       log("🚃 埼玉散歩日和り へようこそ！");
       log("🎮 設定を選んで「ゲームスタート」を押してください");
