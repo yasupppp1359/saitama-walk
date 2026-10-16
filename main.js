@@ -811,12 +811,18 @@ function autoWalkTo(targetId, reachable) {
     applyCamera();
   }
 
-  if (!lastWasBacktrack && path.length > 0) {
-    const popupShown = applyCellEffect(player.pos);
-    if (popupShown) return;
+  // 効果発動は「残り歩数0」の時だけ
+  if (remainingSteps <= 0) {
+    if (!lastWasBacktrack && path.length > 0) {
+      const popupShown = applyCellEffect(player.pos);
+      if (popupShown) return;
+    }
+    endMove();
+    return;
   }
 
-  continueAfterMove();
+  updateHUD();
+  showMoveTargets();
 }
 
 function clearHighlights() {
