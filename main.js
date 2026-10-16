@@ -1,5 +1,5 @@
 // ========================================
-// main.js - ゲームロジック（2倍スケール・効果ポップ対応）
+// main.js - ゲームロジック（完全版）
 // ========================================
 
 window.onerror = (msg, url, line) => {
@@ -169,10 +169,8 @@ let isShowingGoalPopup = false;
 let isShowingEffectPopup = false;
 const poos = new Set();
 
-// 効果ポップアップ用
 let collectingEffects = false;
 let collectedEffects = [];
-let effectOkCallback = null;
 
 let userZoom = 0.6;
 let panOffsetX = 0;
@@ -208,9 +206,6 @@ const goalDialog = document.getElementById("goalDialog");
 const goalReachBtn = document.getElementById("goalReachBtn");
 const goalBannerName = document.getElementById("goalBannerName");
 const panHint = document.getElementById("panHint");
-const effectDialog = document.getElementById("effectDialog");
-const effectList = document.getElementById("effectList");
-const effectOkBtn = document.getElementById("effectOkBtn");
 
 function log(msg) {
   const p = document.createElement("div");
@@ -225,39 +220,62 @@ function log(msg) {
   }
 }
 
-// ===== 効果ポップアップ =====
 function showEffectPopup(callback) {
   if (collectedEffects.length === 0) {
     if (callback) callback();
     return;
   }
 
-  effectList.innerHTML = "";
-  for (const msg of collectedEffects) {
-    const item = document.createElement("div");
-    item.className = "effect-item";
-    item.textContent = msg;
-    effectList.appendChild(item);
+  let dialog = document.getElementById("effectDialog");
+  if (!dialog) {
+    dialog = document.createElement("div");
+    dialog.id = "effectDialog";
+    dialog.innerHTML = `
+      <div class="effect-panel">
+        <div class="effect-list" id="effectList"></div>
+        <button class="effect-ok-btn" id="effectOkBtn">OK</button>
+      </div>
+    `;
+    dialog.style.cssText = "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:450;pointer-events:none;display:flex;justify-content:center;align-items:center;";
+    const panel = dialog.querySelector(".effect-panel");
+    panel.style.cssText = "background:rgba(255,255,255,.98);border-radius:18px;padding:20px 24px;min-width:240px;max-width:90vw;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.35);border:3px solid #5a6a7a;pointer-events:auto;";
+    const listEl = dialog.querySelector(".effect-list");
+    listEl.style.cssText = "display:flex;flex-direction:column;gap:8px;margin-bottom:16px;";
+    const okEl = dialog.querySelector(".effect-ok-btn");
+    okEl.style.cssText = "padding:12px 32px;background:linear-gradient(135deg,#5cb85c,#3c903c);color:#fff;font-size:16px;font-weight:bold;border-radius:10px;border:none;cursor:pointer;min-height:48px;min-width:120px;";
+    document.body.appendChild(dialog);
+  } else {
+    dialog.style.display = "flex";
   }
 
-  effectDialog.classList.remove("hidden");
+  const listEl = document.getElementById("effectList");
+  const okEl = document.getElementById("effectOkBtn");
+
+  listEl.innerHTML = "";
+  for (const msg of collectedEffects) {
+    const item = document.createElement("div");
+    item.style.cssText = "font-size:16px;font-weight:bold;color:#333;padding:6px 10px;background:#f0f4ff;border-radius:10px;";
+    item.textContent = msg;
+    listEl.appendChild(item);
+  }
+
   isShowingEffectPopup = true;
 
   let closed = false;
   const close = () => {
     if (closed) return;
     closed = true;
-    effectDialog.classList.add("hidden");
+    dialog.style.display = "none";
     isShowingEffectPopup = false;
     if (callback) callback();
   };
 
   if (player && player.isCPU) {
-    effectOkBtn.style.display = "none";
+    okEl.style.display = "none";
     setTimeout(close, 800);
   } else {
-    effectOkBtn.style.display = "";
-    effectOkBtn.onclick = close;
+    okEl.style.display = "";
+    okEl.onclick = close;
   }
 }
 
@@ -816,7 +834,6 @@ function applyCellEffect(cellId) {
   collectingEffects = true;
   collectedEffects = [];
 
-  // Event
   if (c.type === CELL.EVENT) {
     playSound("event");
     triggerRandomEvent();
@@ -829,7 +846,6 @@ function applyCellEffect(cellId) {
     return false;
   }
 
-  // Heli
   if (c.type === CELL.HELI) {
     playSound("warp");
     const helis = MAP.filter(x => x.type === CELL.HELI && x.id !== cellId);
@@ -851,7 +867,6 @@ function applyCellEffect(cellId) {
     return false;
   }
 
-  // Nice
   if (c.type === CELL.NICE) {
     playSound("card");
     const nicePool = ["kakekko","dash","spacia","shirakobato","step10","step8","step6","renchanDash","unWo"];
@@ -871,7 +886,6 @@ function applyCellEffect(cellId) {
     return false;
   }
 
-  // Shop
   if (c.type === CELL.SHOP) {
     playSound("coin");
     const price = 5000000;
@@ -1061,7 +1075,7 @@ function checkPendingDialogsOrProceed() {
 
   if ((propDlg && !propDlg.classList.contains("hidden")) ||
       (arrivalDlg && !arrivalDlg.classList.contains("hidden")) ||
-      (effDlg && !effDlg.classList.contains("hidden"))) {
+      (effDlg && effDlg.style.display !== "none")) {
     pendingNextTurn = true;
     return;
   }
@@ -1149,8 +1163,6 @@ function closePropDialog() {
   if (pendingNextTurn) {
     pendingNextTurn = false;
     checkPendingDialogsOrProceed();
-  } else if (turnInProgress && isMoving) {
-    continueAfterMove();
   } else {
     continueAfterMove();
   }
