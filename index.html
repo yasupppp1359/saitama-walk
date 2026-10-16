@@ -29,6 +29,7 @@
 
   #board { flex:1 1 auto; min-height:0; position:relative;
            overflow:hidden;
+           touch-action: none;
            background:
              radial-gradient(circle at 15% 20%, rgba(200,230,200,.65) 0%, transparent 40%),
              radial-gradient(circle at 85% 75%, rgba(180,220,245,.55) 0%, transparent 40%),
@@ -38,6 +39,42 @@
   #boardInner { position:absolute; width:1800px; height:1400px;
                 transform-origin: 0 0; transition: transform .35s ease-out; }
   #lines { position:absolute; top:0; left:0; pointer-events:none; }
+
+  /* ===== ゴールバナー ===== */
+  #goalBanner {
+    position: absolute; top: 8px; left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg,#ffb8ff,#f080f0);
+    color: #fff;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(200,0,200,.4);
+    border: 2px solid #a0a;
+    z-index: 90;
+    pointer-events: none;
+    white-space: nowrap;
+    display: flex; align-items: center; gap: 4px;
+  }
+  #goalBanner .goalLabel { font-size: 12px; }
+  #goalBanner .goalName { font-size: 14px; }
+
+  /* ===== パン用ヒント ===== */
+  #panHint {
+    position: absolute; bottom: 8px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,.55);
+    color: #fff;
+    padding: 3px 12px;
+    border-radius: 14px;
+    font-size: 10px;
+    z-index: 90;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+  #panHint.show { opacity: 1; }
 
   .cell { position:absolute; width:22px; height:22px; border-radius:50%;
           display:flex; align-items:center; justify-content:center;
@@ -439,12 +476,25 @@
   }
   #playerInputs, #cpuInputs { display: flex; flex-direction: column; gap: 8px; }
   .playerRow { display: flex; gap: 8px; align-items: center;
-    background: #f8f8f8; border-radius: 10px; padding: 8px; }
+    background: #f8f8f8; border-radius: 10px; padding: 8px;
+    flex-wrap: wrap; }
   .playerRow .label { font-weight: bold; font-size: 12px; min-width: 76px; }
   .playerRow .nameInput {
-    flex: 1; padding: 8px 10px;
+    flex: 1; padding: 10px 12px;
     border: 2px solid #ccd; border-radius: 8px;
-    font-size: 13px; min-width: 0; }
+    font-size: 16px !important;
+    min-width: 0;
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-appearance: none;
+    appearance: none;
+    touch-action: auto;
+  }
+  .playerRow .nameInput:focus {
+    border-color: #4060d0;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(64,96,208,.2);
+  }
   .playerRow .iconSel { display: flex; gap: 3px; }
   .playerRow .iconSel button {
     font-size: 18px; padding: 4px 6px;
@@ -482,9 +532,14 @@
   <span id="remain">ゴールまで -- マス</span>
 </div>
 <div id="board">
+  <div id="goalBanner">
+    <span class="goalLabel">🎯 現在のゴール：</span>
+    <span class="goalName" id="goalBannerName">-</span>
+  </div>
   <div id="boardInner">
     <svg id="lines" width="1800" height="1400"></svg>
   </div>
+  <div id="panHint">👆 指でドラッグして先を見られます</div>
 </div>
 <div id="log"></div>
 <div id="controls">
