@@ -32,7 +32,7 @@
            touch-action: none;
            background: #b8d4b0;
   }
-  #boardInner { position:absolute; width:2700px; height:2100px;
+  #boardInner { position:absolute; width:3600px; height:2800px;
                 transform-origin: 0 0; transition: transform .35s ease-out;
                 background-image: url('map-bg.jpg');
                 background-size: cover;
@@ -261,6 +261,51 @@
   #saveBtn, #loadBtn { background:#666; color:#fff; }
   #debugBtn { background:#888; color:#fff; font-size:10px; }
   button:disabled { background:#555 !important; cursor:not-allowed; opacity:.5; }
+
+  /* ===== 効果ポップアップ ===== */
+  #effectDialog {
+    position: fixed; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 450;
+    pointer-events: none;
+    display: flex; justify-content: center; align-items: center;
+  }
+  #effectDialog.hidden { display: none; }
+  .effect-panel {
+    background: rgba(255,255,255,.98);
+    border-radius: 18px;
+    padding: 20px 24px;
+    min-width: 240px;
+    max-width: 90vw;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    border: 3px solid #5a6a7a;
+    pointer-events: auto;
+    animation: effectPop .3s ease-out;
+  }
+  @keyframes effectPop {
+    from { transform: scale(.8); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+  .effect-list {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-bottom: 16px;
+  }
+  .effect-item {
+    font-size: 16px; font-weight: bold; color: #333;
+    padding: 6px 10px;
+    background: #f0f4ff;
+    border-radius: 10px;
+  }
+  .effect-ok-btn {
+    padding: 12px 32px;
+    background: linear-gradient(135deg,#5cb85c,#3c903c);
+    color: #fff; font-size: 16px; font-weight: bold;
+    border-radius: 10px; border: none; cursor: pointer;
+    min-height: 48px;
+    min-width: 120px;
+  }
+  .effect-ok-btn:active { transform: scale(.95); }
 
   #handPanel { position: fixed; left:0; right:0; bottom:0; background:#fff;
     border-top: 3px solid #223; padding: 10px; max-height: 60vh;
@@ -641,7 +686,7 @@
     <span class="goalName" id="goalBannerName">-</span>
   </div>
   <div id="boardInner">
-    <svg id="lines" width="2700" height="2100"></svg>
+    <svg id="lines" width="3600" height="2800"></svg>
   </div>
   <div id="panHint">👆 指でドラッグして先を見られます</div>
 </div>
@@ -657,6 +702,13 @@
   <button id="saveBtn">💾</button>
   <button id="loadBtn">📂</button>
   <button id="debugBtn">🎴テスト</button>
+</div>
+
+<div id="effectDialog" class="hidden">
+  <div class="effect-panel">
+    <div class="effect-list" id="effectList"></div>
+    <button class="effect-ok-btn" id="effectOkBtn">OK</button>
+  </div>
 </div>
 
 <div id="handPanel" class="hidden">
@@ -784,14 +836,14 @@
   </div>
 </div>
 
-<script src="data.js?v=6"></script>
-<script src="cards.js?v=6"></script>
-<script src="properties.js?v=6"></script>
-<script src="events.js?v=6"></script>
-<script src="sound.js?v=6"></script>
-<script src="cpu.js?v=6"></script>
-<script src="main.js?v=6"></script>
-<script src="start.js?v=6"></script>
+<script src="data.js?v=8"></script>
+<script src="cards.js?v=8"></script>
+<script src="properties.js?v=8"></script>
+<script src="events.js?v=8"></script>
+<script src="sound.js?v=8"></script>
+<script src="cpu.js?v=8"></script>
+<script src="main.js?v=8"></script>
+<script src="start.js?v=8"></script>
 
 <script>
 if ("serviceWorker" in navigator) {
