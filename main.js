@@ -189,7 +189,6 @@ function log(msg) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-// ===== オートセーブ =====
 function autoSave() {
   if (!players || players.length === 0) return;
   try {
@@ -287,12 +286,12 @@ function drawBoard() {
     const el = document.createElement("div");
     el.className = "cell " + c.type;
     if (c.region) el.classList.add("region-" + c.region);
-    if (c.isGoal) el.classList.add("goal-station");
+    if (c.id === GOAL_ID) el.classList.add("goal-station");
     if (c.kind === "prop") el.classList.add("prop-station");
     el.style.left = c.x + "px";
     el.style.top = c.y + "px";
     el.dataset.cellId = c.id;
-    if (c.isGoal) el.textContent = "🚩";
+    if (c.id === GOAL_ID) el.textContent = "🚩";
     else if (c.kind === "prop") el.textContent = "🏘";
     else if (c.type === CELL.STATION) el.textContent = "🏠";
     else if (c.type === CELL.EVENT) el.textContent = "✨";
@@ -780,7 +779,7 @@ function applyCellEffect(cellId) {
     const a = Math.floor(base * mult);
     player.money -= a;
     log("🟥 " + player.name + " −" + ky(a));
-  } else if (c.kind === "goal") {
+  } else if (c.id === GOAL_ID) {
     playSound("goal");
     const arrivedPlayerName = player.name;
     const arrivedGoalName = c.name;
@@ -831,25 +830,52 @@ function applyCellEffect(cellId) {
 }
 
 function showGoalArrivalPopup(arrivedPlayer, goalName, prize, happyBonus, nextGoal) {
-  document.getElementById("arrivalName").textContent = arrivedPlayer;
-  document.getElementById("arrivalGoal").textContent = goalName;
-  document.getElementById("arrivalPrize").textContent =
-    "🏆 賞金 +" + ky(prize) + (happyBonus ? "（ハッピー2倍！）" : "");
-  document.getElementById("arrivalNext").innerHTML = nextGoal
+  let dialog = document.getElementById("goalArrivalDialog");
+
+  if (!dialog) {
+    dialog = document.createElement("div");
+    dialog.id = "goalArrivalDialog";
+    dialog.innerHTML = `
+      <div class="goalArrivalPanel">
+        <h2>🎉 目的地に到着！ 🎉</h2>
+        <p class="arrivalMsg"><span class="arrivalName" id="arrivalName">-</span> が</p>
+        <p class="arrivalMsg"><span class="arrivalName" id="arrivalGoal">-</span> に到着！</p>
+        <p class="arrivalPrize" id="arrivalPrize">-</p>
+        <p class="arrivalNext" id="arrivalNext">-</p>
+        <button class="arrivalOkBtn" id="goalArrivalOkBtn">OK</button>
+      </div>
+    `;
+    dialog.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;justify-content:center;align-items:center;padding:16px;";
+    const panel = dialog.querySelector(".goalArrivalPanel");
+    panel.style.cssText = "background:linear-gradient(135deg,#fff0ff,#ffe0f5);border-radius:20px;padding:24px;width:min(420px,100%);text-align:center;box-shadow:0 12px 40px rgba(200,0,150,.5);border:3px solid #f080f0;";
+    document.body.appendChild(dialog);
+  }
+
+  const nameEl = document.getElementById("arrivalName");
+  const goalEl = document.getElementById("arrivalGoal");
+  const prizeEl = document.getElementById("arrivalPrize");
+  const nextEl = document.getElementById("arrivalNext");
+
+  if (nameEl) nameEl.textContent = arrivedPlayer;
+  if (goalEl) goalEl.textContent = goalName;
+  if (prizeEl) prizeEl.textContent = "🏆 賞金 +" + ky(prize) + (happyBonus ? "（ハッピー2倍！）" : "");
+  if (nextEl) nextEl.innerHTML = nextGoal
     ? '🎯 次の目的地：<strong>' + nextGoal + '</strong>'
     : '🎮 ゲーム終了！';
 
-  const dialog = document.getElementById("goalArrivalDialog");
   dialog.classList.remove("hidden");
 
-  document.getElementById("goalArrivalOkBtn").onclick = () => {
-    dialog.classList.add("hidden");
-    playSound("pop");
-    if (pendingNextTurn) {
-      pendingNextTurn = false;
-      checkPendingDialogsOrProceed();
-    }
-  };
+  const okBtn = document.getElementById("goalArrivalOkBtn");
+  if (okBtn) {
+    okBtn.onclick = () => {
+      dialog.classList.add("hidden");
+      playSound("pop");
+      if (pendingNextTurn) {
+        pendingNextTurn = false;
+        checkPendingDialogsOrProceed();
+      }
+    };
+  }
 }
 
 function checkPendingDialogsOrProceed() {
