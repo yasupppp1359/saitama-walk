@@ -1,5 +1,5 @@
 // ========================================
-// main.js - ゲームロジック（特殊マス・ゴール判定・パン対応）
+// main.js - ゲームロジック（オートセーブ対応）
 // ========================================
 
 window.onerror = (msg, url, line) => {
@@ -144,7 +144,6 @@ let pendingSettlement = false;
 let pendingSettlementCallback = null;
 const poos = new Set();
 
-// ===== パン（ドラッグ移動）状態 =====
 let panOffsetX = 0;
 let panOffsetY = 0;
 let isPanning = false;
@@ -189,7 +188,62 @@ function log(msg) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-// ===== ゴールバナー更新 =====
+// ===== オートセーブ =====
+function autoSave() {
+  if (!players || players.length === 0) return;
+  try {
+    const data = {
+      players: players.map(p => ({
+        id: p.id, name: p.name, icon: p.icon,
+        money: p.money, pos: p.pos,
+        cards: [...p.cards], buffs: { ...p.buffs },
+        isCPU: p.isCPU, cpuLevel: p.cpuLevel
+      })),
+      currentPlayerIndex,
+      day, month, GOAL_ID, maxMonth,
+      poos: [...poos],
+      props: ALL_PROPS.map(p => ({ id:p.id, owner:p.owner, price:p.price })),
+      globalSeal: (typeof globalSeal !== "undefined" ? globalSeal : 0),
+    };
+    localStorage.setItem("saitama_auto", JSON.stringify(data));
+  } catch (e) {
+    console.warn("Autosave failed:", e);
+  }
+}
+
+function loadAutoSave() {
+  const raw = localStorage.getItem("saitama_auto");
+  if (!raw) return false;
+  try {
+    const data = JSON.parse(raw);
+    if (!data.players || data.players.length === 0) return false;
+    players = data.players;
+    currentPlayerIndex = data.currentPlayerIndex || 0;
+    player = players[currentPlayerIndex];
+    day = data.day || 1;
+    month = data.month || 1;
+    maxMonth = data.maxMonth || 12;
+    if (data.poos) { poos.clear(); data.poos.forEach(id => poos.add(id)); }
+    if (data.props) {
+      for (const saved of data.props) {
+        const p = ALL_PROPS.find(x => x.id === saved.id);
+        if (p) {
+          p.owner = saved.owner;
+          if (saved.price) p.price = saved.price;
+        }
+      }
+    }
+    if (typeof globalSeal !== "undefined") globalSeal = data.globalSeal || 0;
+    for (const c of MAP) c.isGoal = false;
+    GOAL_ID = data.GOAL_ID;
+    CELL_BY_ID[GOAL_ID].isGoal = true;
+    return true;
+  } catch (e) {
+    console.warn("Auto-load failed:", e);
+    return false;
+  }
+}
+
 function updateGoalBanner() {
   if (!goalBannerName) return;
   const goalCell = CELL_BY_ID[GOAL_ID];
@@ -299,11 +353,9 @@ function applyCamera() {
   }
 }
 
-// ===== パン（ドラッグ）操作 =====
 function setupPan() {
   const target = boardOuter;
 
-  // マウス対応
   target.addEventListener("mousedown", (e) => {
     if (isFullMap) return;
     if (e.target.closest(".cell") && e.target.classList.contains("highlight")) return;
@@ -318,7 +370,6 @@ function setupPan() {
     endPan();
   });
 
-  // タッチ対応
   target.addEventListener("touchstart", (e) => {
     if (isFullMap) return;
     if (e.touches.length !== 1) return;
@@ -332,10 +383,7 @@ function setupPan() {
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
     movePan(t.clientX, t.clientY);
-    if (Math.abs(panOffsetX) > 10 || Math.abs(panOffsetY) > 10) {
-      e.preventDefault();
-    }
-  }, { passive: false });
+  }, { passive: true });
 
   target.addEventListener("touchend", () => {
     if (!isPanning) return;
@@ -364,7 +412,6 @@ function movePan(x, y) {
   if (!isPanning) return;
   const dx = x - panStartX;
   const dy = y - panStartY;
-  // パンの限界（±400pxまで）
   panOffsetX = Math.max(-400, Math.min(400, panStartOffsetX + dx));
   panOffsetY = Math.max(-400, Math.min(400, panStartOffsetY + dy));
   applyCamera();
@@ -372,7 +419,6 @@ function movePan(x, y) {
 
 function endPan() {
   isPanning = false;
-  // ゆっくり元に戻る
   boardEl.style.transition = "transform .4s ease-out";
   panOffsetX = 0;
   panOffsetY = 0;
@@ -849,6 +895,9 @@ function endMove() {
   goalReachBtn.classList.remove("show");
   log("── " + player.name + " のターン終了 ──");
 
+  // ★ オートセーブ
+  autoSave();
+
   if (!player.isCPU && player.money < 0) {
     debtResolveCallback = () => {
       proceedToNextPlayer();
@@ -1160,6 +1209,9 @@ function endGame() {
   stopBGM();
   playSound("victory");
   log("🎉 ゲーム終了！");
+
+  // 終了時はオートセーブをクリア
+  localStorage.removeItem("saitama_auto");
 
   document.getElementById("endDate").textContent =
     maxMonth + "ヶ月間の最終結果";
@@ -1566,6 +1618,7 @@ debugBtn.onclick = () => {
 };
 
 document.getElementById("restartBtn").onclick = () => {
+  localStorage.removeItem("saitama_auto");
   location.reload();
 };
 
@@ -1574,6 +1627,9 @@ function startGame(config) {
   if (audioCtx && audioCtx.state === "suspended") {
     audioCtx.resume();
   }
+
+  // 新規開始時にオートセーブをクリア
+  localStorage.removeItem("saitama_auto");
 
   players = [];
   currentPlayerIndex = 0;
@@ -1646,6 +1702,21 @@ window.startGame = startGame;
 
 // ===== パン操作の初期化 =====
 setupPan();
+
+// ===== 自動ロード =====
+(function tryAutoLoad() {
+  if (loadAutoSave()) {
+    document.getElementById("startScreen").classList.add("hidden");
+    log("📂 前回の続きから再開しました（" + month + "ヶ月目 " + day + "日）");
+    drawBoard();
+    updateGoalBanner();
+    applyCamera();
+    startBGM();
+    setTimeout(() => {
+      beginTurn(player);
+    }, 100);
+  }
+})();
 
 log("🚃 埼玉散歩日和り へようこそ！");
 log("🎮 設定を選んで「ゲームスタート」を押してください");
