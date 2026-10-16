@@ -1,5 +1,5 @@
 // ========================================
-// main.js - ゲームロジック（特殊マス・ゴール判定対応）
+// main.js - ゲームロジック（特殊マス・ゴール判定・パン対応）
 // ========================================
 
 window.onerror = (msg, url, line) => {
@@ -144,6 +144,17 @@ let pendingSettlement = false;
 let pendingSettlementCallback = null;
 const poos = new Set();
 
+// ===== パン（ドラッグ移動）状態 =====
+let panOffsetX = 0;
+let panOffsetY = 0;
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let panStartOffsetX = 0;
+let panStartOffsetY = 0;
+let panHintTimer = null;
+let hasShownPanHint = false;
+
 const boardOuter = document.getElementById("board");
 const boardEl = document.getElementById("boardInner");
 const svgEl = document.getElementById("lines");
@@ -165,6 +176,8 @@ const rankDialog = document.getElementById("rankDialog");
 const endDialog = document.getElementById("endDialog");
 const goalDialog = document.getElementById("goalDialog");
 const goalReachBtn = document.getElementById("goalReachBtn");
+const goalBannerName = document.getElementById("goalBannerName");
+const panHint = document.getElementById("panHint");
 
 function log(msg) {
   const p = document.createElement("div");
@@ -174,6 +187,15 @@ function log(msg) {
     logEl.removeChild(logEl.firstChild);
   }
   logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ===== ゴールバナー更新 =====
+function updateGoalBanner() {
+  if (!goalBannerName) return;
+  const goalCell = CELL_BY_ID[GOAL_ID];
+  if (goalCell) {
+    goalBannerName.textContent = goalCell.name || "ゴール";
+  }
 }
 
 function drawBoard() {
@@ -216,6 +238,7 @@ function drawBoard() {
     }
   }
   drawAllPlayers();
+  updateGoalBanner();
   applyCamera();
   redrawYellowed();
 }
@@ -270,19 +293,117 @@ function applyCamera() {
     const cell = CELL_BY_ID[player.pos];
     const cx = boardOuter.clientWidth / 2;
     const cy = boardOuter.clientHeight / 2;
-    const ox = cx - cell.x * zoom;
-    const oy = cy - cell.y * zoom;
+    const ox = cx - cell.x * zoom + panOffsetX;
+    const oy = cy - cell.y * zoom + panOffsetY;
     boardEl.style.transform = `translate(${ox}px, ${oy}px) scale(${zoom})`;
   }
 }
+
+// ===== パン（ドラッグ）操作 =====
+function setupPan() {
+  const target = boardOuter;
+
+  // マウス対応
+  target.addEventListener("mousedown", (e) => {
+    if (isFullMap) return;
+    if (e.target.closest(".cell") && e.target.classList.contains("highlight")) return;
+    startPan(e.clientX, e.clientY);
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!isPanning) return;
+    movePan(e.clientX, e.clientY);
+  });
+  window.addEventListener("mouseup", () => {
+    if (!isPanning) return;
+    endPan();
+  });
+
+  // タッチ対応
+  target.addEventListener("touchstart", (e) => {
+    if (isFullMap) return;
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    if (e.target.closest(".cell") && e.target.classList.contains("highlight")) return;
+    startPan(t.clientX, t.clientY);
+  }, { passive: true });
+
+  target.addEventListener("touchmove", (e) => {
+    if (!isPanning) return;
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    movePan(t.clientX, t.clientY);
+    if (Math.abs(panOffsetX) > 10 || Math.abs(panOffsetY) > 10) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  target.addEventListener("touchend", () => {
+    if (!isPanning) return;
+    endPan();
+  });
+
+  target.addEventListener("touchcancel", () => {
+    if (!isPanning) return;
+    endPan();
+  });
+}
+
+function startPan(x, y) {
+  isPanning = true;
+  panStartX = x;
+  panStartY = y;
+  panStartOffsetX = panOffsetX;
+  panStartOffsetY = panOffsetY;
+  boardEl.style.transition = "none";
+  if (!hasShownPanHint) {
+    showPanHint();
+  }
+}
+
+function movePan(x, y) {
+  if (!isPanning) return;
+  const dx = x - panStartX;
+  const dy = y - panStartY;
+  // パンの限界（±400pxまで）
+  panOffsetX = Math.max(-400, Math.min(400, panStartOffsetX + dx));
+  panOffsetY = Math.max(-400, Math.min(400, panStartOffsetY + dy));
+  applyCamera();
+}
+
+function endPan() {
+  isPanning = false;
+  // ゆっくり元に戻る
+  boardEl.style.transition = "transform .4s ease-out";
+  panOffsetX = 0;
+  panOffsetY = 0;
+  setTimeout(() => {
+    applyCamera();
+  }, 20);
+  setTimeout(() => {
+    boardEl.style.transition = "transform .35s ease-out";
+  }, 450);
+}
+
+function showPanHint() {
+  hasShownPanHint = true;
+  if (!panHint) return;
+  panHint.classList.add("show");
+  if (panHintTimer) clearTimeout(panHintTimer);
+  panHintTimer = setTimeout(() => {
+    panHint.classList.remove("show");
+  }, 2500);
+}
+
 window.addEventListener("resize", applyCamera);
 
 function toggleFullMap() {
   isFullMap = !isFullMap;
+  panOffsetX = 0;
+  panOffsetY = 0;
   mapToggleBtn.textContent = isFullMap ? "🔍 拡大表示" : "🗺 全体マップ";
   boardEl.style.transition = "transform .35s ease-out";
   applyCamera();
-  setTimeout(() => { boardEl.style.transition = "none"; }, 360);
+  setTimeout(() => { boardEl.style.transition = "transform .35s ease-out"; }, 360);
 }
 
 function updateHUD() {
@@ -443,7 +564,10 @@ function showMoveTargets() {
     hasOther = true;
     el.classList.add("highlight");
     el.dataset.dist = info.dist;
-    el.onclick = () => autoWalkTo(id, reachable);
+    el.onclick = (e) => {
+      e.stopPropagation();
+      autoWalkTo(id, reachable);
+    };
   }
   if (!hasOther) {
     log("🚧 動けるマスがありません。ターン終了");
@@ -611,6 +735,7 @@ function applyCellEffect(cellId) {
       newGoal.isGoal = true;
       GOAL_ID = newGoal.id;
       log("🎯 次のゴール：" + newGoal.name);
+      updateGoalBanner();
       drawBoard();
     }
   } else if (c.kind === "prop") {
@@ -718,6 +843,8 @@ function endMove() {
   isMoving = false;
   remainingSteps = 0;
   turnPath = [];
+  panOffsetX = 0;
+  panOffsetY = 0;
   clearHighlights();
   goalReachBtn.classList.remove("show");
   log("── " + player.name + " のターン終了 ──");
@@ -809,6 +936,8 @@ function beginTurn(p) {
   isMoving = false;
   remainingSteps = 0;
   turnPath = [];
+  panOffsetX = 0;
+  panOffsetY = 0;
 
   drawAllPlayers();
   applyCamera();
@@ -840,7 +969,7 @@ function advanceDay() {
     log("📅 " + month + "ヶ月目スタート");
   }
   if (day === 10 || day === 20 || day === 30) {
-    log("🎁 " + day + "日 ボーナス日");
+    log("🎁 " + day + " 日 ボーナス日");
     pendingSettlement = true;
     pendingSettlementCallback = () => beginTurn(player);
   }
@@ -850,7 +979,6 @@ function advanceDay() {
   }
 }
 
-// ===== ゴールにいける？ =====
 function checkGoalReach() {
   if (!isMoving || remainingSteps <= 0) return;
 
@@ -1178,6 +1306,7 @@ function changeGoal() {
   newGoal.isGoal = true;
   GOAL_ID = newGoal.id;
   log("🚫 ゴールが " + newGoal.name + " に変更！");
+  updateGoalBanner();
   drawBoard();
 }
 
@@ -1332,7 +1461,7 @@ function renderDebtDialog() {
           updateHUD();
           if (player.money >= 0) {
             log("✅ 借金返済完了！");
-       closeDebtDialog();
+            closeDebtDialog();
           } else {
             renderDebtDialog();
           }
@@ -1419,6 +1548,7 @@ document.getElementById("loadBtn").onclick = () => {
   CELL_BY_ID[GOAL_ID].isGoal = true;
   document.getElementById("startScreen").classList.add("hidden");
   drawBoard();
+  updateGoalBanner();
   applyCamera();
   startBGM();
   log("📂 ロードしました");
@@ -1493,6 +1623,8 @@ function startGame(config) {
   isFullMap = false;
   pendingSettlement = false;
   pendingSettlementCallback = null;
+  panOffsetX = 0;
+  panOffsetY = 0;
   if (typeof globalSeal !== "undefined") globalSeal = 0;
 
   document.getElementById("startScreen").classList.add("hidden");
@@ -1504,6 +1636,7 @@ function startGame(config) {
   log("🚁 ヘリポート / ⭐ ナイスカード / 🎴 カード売り場");
 
   drawBoard();
+  updateGoalBanner();
   applyCamera();
   startBGM();
   beginTurn(players[0]);
@@ -1511,5 +1644,9 @@ function startGame(config) {
 
 window.startGame = startGame;
 
+// ===== パン操作の初期化 =====
+setupPan();
+
 log("🚃 埼玉散歩日和り へようこそ！");
 log("🎮 設定を選んで「ゲームスタート」を押してください");
+log("👆 盤面を指でドラッグすると先を見られます");
