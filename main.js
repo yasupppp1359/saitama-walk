@@ -75,7 +75,7 @@ function buildMap() {
     const A = stMap[aId], B = stMap[bId];
     if (!A || !B) continue;
     const dist = Math.hypot(A.x - B.x, A.y - B.y);
-    const n = dist < 200 ? 3 : dist < 300 ? 4 : dist < 400 ? 5 : dist < 500 ? 6 : 7;
+    const n = dist < 300 ? 3 : dist < 450 ? 4 : dist < 600 ? 5 : dist < 750 ? 6 : 7;
     let prevId = stationIdMap[aId];
     for (let i = 1; i <= n; i++) {
       const t = i / (n + 1);
