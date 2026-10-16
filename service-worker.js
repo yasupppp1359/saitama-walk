@@ -2,7 +2,7 @@
 // service-worker.js - オフライン対応
 // ========================================
 
-const CACHE_NAME = "saitama-walk-v1";
+const CACHE_NAME = "saitama-walk-v2";
 const CACHE_FILES = [
   "./",
   "./index.html",
