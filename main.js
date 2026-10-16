@@ -1,5 +1,5 @@
 // ========================================
-// main.js - ゲームロジック（完全版）
+// main.js - ゲームロジック（ピンチズーム対応・最終版）
 // ========================================
 
 window.onerror = (msg, url, line) => {
@@ -145,6 +145,7 @@ let pendingSettlementCallback = null;
 let pendingNextTurn = false;
 const poos = new Set();
 
+let userZoom = 0.9;
 let panOffsetX = 0;
 let panOffsetY = 0;
 let isPanning = false;
@@ -361,7 +362,7 @@ function applyCamera() {
     const oy = (boardOuter.clientHeight - sh) / 2;
     boardEl.style.transform = `translate(${ox}px, ${oy}px) scale(${scale})`;
   } else {
-    const zoom = 0.9;
+    const zoom = userZoom;
     const cx = boardOuter.clientWidth / 2;
     const cy = boardOuter.clientHeight / 2;
     const ox = cx - cell.x * zoom + panOffsetX;
@@ -372,7 +373,10 @@ function applyCamera() {
 
 function setupPan() {
   const target = boardOuter;
+  let pinchStartDist = 0;
+  let pinchStartZoom = 1;
 
+  // ===== マウス =====
   target.addEventListener("mousedown", (e) => {
     if (isFullMap) return;
     if (e.target.closest(".cell") && e.target.classList.contains("highlight")) return;
@@ -387,8 +391,26 @@ function setupPan() {
     endPan();
   });
 
+  // マウスホイールでズーム
+  target.addEventListener("wheel", (e) => {
+    if (isFullMap) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    userZoom = Math.max(0.3, Math.min(3.0, userZoom * delta));
+    applyCamera();
+  }, { passive: false });
+
+  // ===== タッチ =====
   target.addEventListener("touchstart", (e) => {
     if (isFullMap) return;
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      pinchStartDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      pinchStartZoom = userZoom;
+      isPanning = false;
+      return;
+    }
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
     if (e.target.closest(".cell") && e.target.classList.contains("highlight")) return;
@@ -396,13 +418,26 @@ function setupPan() {
   }, { passive: true });
 
   target.addEventListener("touchmove", (e) => {
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      if (pinchStartDist > 0) {
+        userZoom = Math.max(0.3, Math.min(3.0, pinchStartZoom * (dist / pinchStartDist)));
+        applyCamera();
+      }
+      return;
+    }
     if (!isPanning) return;
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
     movePan(t.clientX, t.clientY);
   }, { passive: true });
 
-  target.addEventListener("touchend", () => {
+  target.addEventListener("touchend", (e) => {
+    if (e.touches && e.touches.length === 0) {
+      pinchStartDist = 0;
+    }
     if (!isPanning) return;
     endPan();
   });
@@ -783,6 +818,7 @@ function applyCellEffect(cellId) {
     playSound("goal");
     const arrivedPlayerName = player.name;
     const arrivedGoalName = c.name;
+    const arrivedCellId = cellId;
     log("🚩 " + arrivedPlayerName + " が " + arrivedGoalName + " に到着！");
     const basePrize = 50000000 * month;
     let prize = basePrize;
@@ -818,18 +854,23 @@ function applyCellEffect(cellId) {
       drawBoard();
     }
 
-    showGoalArrivalPopup(arrivedPlayerName, arrivedGoalName, prize, happyBonus, nextGoalName);
-  } else if (c.kind === "prop") {
+    showGoalArrivalPopup(arrivedPlayerName, arrivedGoalName, prize, happyBonus, nextGoalName, arrivedCellId);
+  } else if (c.kind === "goal" || c.kind === "prop") {
     if (player.isCPU) {
       cpuBuyProperty(cellId);
     } else {
-      openPropDialog(cellId);
+      const props = getPropsAtStation(cellId);
+      if (props.length > 0) {
+        openPropDialog(cellId);
+      } else {
+        log("🏘 " + (c.name || "この駅") + " には物件がありません");
+      }
     }
   }
   updateHUD();
 }
 
-function showGoalArrivalPopup(arrivedPlayer, goalName, prize, happyBonus, nextGoal) {
+function showGoalArrivalPopup(arrivedPlayer, goalName, prize, happyBonus, nextGoal, goalCellId) {
   let dialog = document.getElementById("goalArrivalDialog");
 
   if (!dialog) {
@@ -870,6 +911,15 @@ function showGoalArrivalPopup(arrivedPlayer, goalName, prize, happyBonus, nextGo
     okBtn.onclick = () => {
       dialog.classList.add("hidden");
       playSound("pop");
+
+      if (goalCellId && !player.isCPU) {
+        const props = getPropsAtStation(goalCellId);
+        if (props.length > 0) {
+          openPropDialog(goalCellId);
+          return;
+        }
+      }
+
       if (pendingNextTurn) {
         pendingNextTurn = false;
         checkPendingDialogsOrProceed();
@@ -1778,6 +1828,7 @@ function startGame(config) {
   pendingNextTurn = false;
   panOffsetX = 0;
   panOffsetY = 0;
+  userZoom = 0.9;
   if (typeof globalSeal !== "undefined") globalSeal = 0;
 
   document.getElementById("startScreen").classList.add("hidden");
