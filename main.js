@@ -1710,24 +1710,53 @@ window.startGame = startGame;
 // ===== パン操作の初期化 =====
 setupPan();
 
-// ===== 自動ロード（最後に実行） =====
-(function tryAutoLoad() {
+// ===== 自動ロード判定 =====
+(function checkAutoLoad() {
+  const raw = localStorage.getItem("saitama_auto");
+  if (!raw) {
+    // セーブなし → そのまま開始画面
+    log("🚃 埼玉散歩日和り へようこそ！");
+    log("🎮 設定を選んで「ゲームスタート」を押してください");
+    return;
+  }
   try {
-    if (loadAutoSave()) {
-      document.getElementById("startScreen").classList.add("hidden");
-      drawBoard();
-      updateGoalBanner();
-      applyCamera();
-      startBGM();
-      log("📂 前回の続きから再開しました（" + month + "ヶ月目 " + day + "日）");
-      setTimeout(() => {
-        beginTurn(player);
-      }, 150);
+    const data = JSON.parse(raw);
+    if (!data.players || data.players.length === 0) {
+      log("🚃 埼玉散歩日和り へようこそ！");
       return;
     }
+    // 再開ダイアログを表示
+    const dialog = document.getElementById("resumeDialog");
+    const detail = document.getElementById("resumeDetail");
+    dialog.classList.remove("hidden");
+
+    const savedPlayer = data.players[data.currentPlayerIndex || 0];
+    detail.textContent = (data.month || 1) + "ヶ月目 " +
+      (data.day || 1) + "日 / " +
+      (savedPlayer ? savedPlayer.name : "?");
+
+    document.getElementById("resumeBtn").onclick = () => {
+      dialog.classList.add("hidden");
+      if (loadAutoSave()) {
+        document.getElementById("startScreen").classList.add("hidden");
+        drawBoard();
+        updateGoalBanner();
+        applyCamera();
+        startBGM();
+        log("📂 前回の続きから再開しました（" + month + "ヶ月目 " + day + "日）");
+        setTimeout(() => {
+          beginTurn(player);
+        }, 150);
+      }
+    };
+
+    document.getElementById("newGameBtn").onclick = () => {
+      dialog.classList.add("hidden");
+      localStorage.removeItem("saitama_auto");
+      log("🆕 新規ゲームを開始します");
+    };
   } catch (e) {
-    console.warn("Auto-load error:", e);
+    console.warn("Auto-load check error:", e);
+    log("🚃 埼玉散歩日和り へようこそ！");
   }
-  log("🚃 埼玉散歩日和り へようこそ！");
-  log("🎮 設定を選んで「ゲームスタート」を押してください");
 })();
