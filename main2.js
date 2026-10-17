@@ -625,7 +625,7 @@ function checkGoalReach() {
       path.unshift(cur);
       cur = reachable.get(cur).parent;
     }
-    // 最短経路を歩く
+    // 最短経路を歩く（歩数消費のみ）
     for (const cellId of path) {
       player.pos = cellId;
       turnPath.push(cellId);
