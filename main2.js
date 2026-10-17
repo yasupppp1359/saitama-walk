@@ -226,7 +226,7 @@ function applyCellEffect(cellId) {
     player.money += prize;
     log("🏆 " + arrivedPlayerName + " 賞金 +" + ky(prize));
     showConfetti(60);
-    cpuSpeak("goal");
+    if (player.isCPU) cpuSpeak("goal");
 
     for (const p of players) {
       if (p === player) continue;
@@ -625,21 +625,16 @@ function checkGoalReach() {
       path.unshift(cur);
       cur = reachable.get(cur).parent;
     }
+    // 最短経路を歩く
     for (const cellId of path) {
-      const c = CELL_BY_ID[player.pos];
-      const isFwd = c.next.includes(cellId);
       player.pos = cellId;
-      if (isFwd) {
-        turnPath.push(cellId);
-        remainingSteps--;
-      } else {
-        turnPath.pop();
-        remainingSteps++;
-      }
+      turnPath.push(cellId);
+      remainingSteps--;
       playSound("move");
       drawAllPlayers();
       applyCamera();
     }
+    // ゴール到着処理
     applyCellEffect(player.pos);
   };
 
