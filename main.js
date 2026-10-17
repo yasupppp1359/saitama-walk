@@ -236,7 +236,7 @@ function showEffectPopup(callback) {
         <button class="effect-ok-btn" id="effectOkBtn">OK</button>
       </div>
     `;
-    dialog.style.cssText = "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:450;pointer-events:none;display:flex;justify-content:center;align-items:center;";
+    dialog.style.cssText = "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:450;pointer-events:none;display:none;justify-content:center;align-items:center;";
     const panel = dialog.querySelector(".effect-panel");
     panel.style.cssText = "background:rgba(255,255,255,.98);border-radius:18px;padding:20px 24px;min-width:240px;max-width:90vw;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.35);border:3px solid #5a6a7a;pointer-events:auto;";
     const listEl = dialog.querySelector(".effect-list");
@@ -244,9 +244,10 @@ function showEffectPopup(callback) {
     const okEl = dialog.querySelector(".effect-ok-btn");
     okEl.style.cssText = "padding:12px 32px;background:linear-gradient(135deg,#5cb85c,#3c903c);color:#fff;font-size:16px;font-weight:bold;border-radius:10px;border:none;cursor:pointer;min-height:48px;min-width:120px;";
     document.body.appendChild(dialog);
-  } else {
-    dialog.style.display = "flex";
   }
+
+  dialog.classList.remove("hidden");
+  dialog.style.display = "flex";
 
   const listEl = document.getElementById("effectList");
   const okEl = document.getElementById("effectOkBtn");
@@ -266,6 +267,7 @@ function showEffectPopup(callback) {
     if (closed) return;
     closed = true;
     dialog.style.display = "none";
+    dialog.classList.add("hidden");
     isShowingEffectPopup = false;
     if (callback) callback();
   };
@@ -811,7 +813,6 @@ function autoWalkTo(targetId, reachable) {
     applyCamera();
   }
 
-  // 効果発動は「残り歩数0」の時だけ
   if (remainingSteps <= 0) {
     if (!lastWasBacktrack && path.length > 0) {
       const popupShown = applyCellEffect(player.pos);
@@ -1079,9 +1080,13 @@ function checkPendingDialogsOrProceed() {
   const arrivalDlg = document.getElementById("goalArrivalDialog");
   const effDlg = document.getElementById("effectDialog");
 
-  if ((propDlg && !propDlg.classList.contains("hidden")) ||
-      (arrivalDlg && !arrivalDlg.classList.contains("hidden")) ||
-      (effDlg && effDlg.style.display !== "none")) {
+  const propVisible = propDlg && !propDlg.classList.contains("hidden");
+  const arrivalVisible = arrivalDlg && !arrivalDlg.classList.contains("hidden");
+  const effVisible = effDlg &&
+    !effDlg.classList.contains("hidden") &&
+    effDlg.style.display !== "none";
+
+  if (propVisible || arrivalVisible || effVisible) {
     pendingNextTurn = true;
     return;
   }
@@ -1923,7 +1928,9 @@ function startGame(config) {
   localStorage.removeItem("saitama_auto");
 
   for (const c of MAP) c.isGoal = false;
-  GOAL_ID = stationIdMap["fukaya"];
+  const allGoals = MAP.filter(c => c.kind === "goal");
+  const randomGoal = allGoals[Math.floor(Math.random() * allGoals.length)];
+  GOAL_ID = randomGoal.id;
   CELL_BY_ID[GOAL_ID].isGoal = true;
 
   players = [];
@@ -1989,6 +1996,7 @@ function startGame(config) {
   log("🎮 ゲームスタート！");
   log("プレイヤー：" + players.map(p => p.name).join(" / "));
   log("プレイ期間：" + maxMonth + "ヶ月");
+  log("🎯 今回の目的地：" + randomGoal.name);
 
   drawBoard();
   updateGoalBanner();
