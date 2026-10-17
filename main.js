@@ -83,9 +83,9 @@ function buildMap() {
       const y = A.y + (B.y - A.y) * t;
       const r = Math.random();
       let type;
-      if (r < 0.04) type = CELL.EVENT;
-      else if (r < 0.50) type = CELL.PLUS;
-      else if (r < 0.85) type = CELL.MINUS;
+      if (r < 0.06) type = CELL.EVENT;
+      else if (r < 0.52) type = CELL.PLUS;
+      else if (r < 0.86) type = CELL.MINUS;
       else type = CELL.CARD;
       const newId = nextId++;
       add({ id:newId, type, x, y, next:[] });
@@ -379,6 +379,15 @@ function drawBoard() {
     if (c.region) el.classList.add("region-" + c.region);
     if (c.id === GOAL_ID) el.classList.add("goal-station");
     if (c.kind === "prop") el.classList.add("prop-station");
+    if (c.kind === "goal" || c.kind === "prop") {
+      const props = getPropsAtStation(c.id);
+      if (props.length > 0) {
+        const owner = props[0].owner;
+        if (owner !== null && props.every(p => p.owner === owner)) {
+          el.classList.add("monopoly-" + owner);
+        }
+      }
+    }
     el.style.left = c.x + "px";
     el.style.top = c.y + "px";
     el.dataset.cellId = c.id;
