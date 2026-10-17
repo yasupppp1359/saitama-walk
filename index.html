@@ -48,6 +48,20 @@
   }
   #lines { position:absolute; top:0; left:0; pointer-events:none; }
 
+  /* ===== 指南矢印 ===== */
+  #guideArrow {
+    position: absolute;
+    font-size: 30px;
+    z-index: 70;
+    pointer-events: none;
+    color: #ff3060;
+    text-shadow: 0 0 4px #fff, 0 0 8px #fff, 0 0 12px #fff;
+    transform-origin: center;
+    transition: left .2s, top .2s;
+    display: none;
+    font-weight: bold;
+  }
+
   #goalBanner {
     position: absolute; top: 8px; left: 50%;
     transform: translateX(-50%);
@@ -170,12 +184,6 @@
   }
   .cell.station.monopoly-3 {
     box-shadow: 0 3px 0 #e05090, 0 6px 12px rgba(224,80,144,.4), 0 0 0 5px #ff90c0;
-  }
-  .cell.station.goal-station.monopoly-0,
-  .cell.station.goal-station.monopoly-1,
-  .cell.station.goal-station.monopoly-2,
-  .cell.station.goal-station.monopoly-3 {
-    animation: goalPulse 1.6s infinite ease-in-out;
   }
 
   /* ===== 紙吹雪 ===== */
@@ -865,15 +873,15 @@
   </div>
 </div>
 
-<script src="data.js?v=18"></script>
-<script src="cards.js?v=18"></script>
-<script src="properties.js?v=18"></script>
-<script src="events.js?v=18"></script>
-<script src="sound.js?v=18"></script>
-<script src="cpu.js?v=18"></script>
-<script src="main.js?v=18"></script>
-<script src="main2.js?v=18"></script>
-<script src="start.js?v=18"></script>
+<script src="data.js?v=21"></script>
+<script src="cards.js?v=21"></script>
+<script src="properties.js?v=21"></script>
+<script src="events.js?v=21"></script>
+<script src="sound.js?v=21"></script>
+<script src="cpu.js?v=21"></script>
+<script src="main.js?v=21"></script>
+<script src="main2.js?v=21"></script>
+<script src="start.js?v=21"></script>
 
 <script>
 if ("serviceWorker" in navigator) {
