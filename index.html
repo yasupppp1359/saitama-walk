@@ -158,6 +158,42 @@
       0 5px 10px rgba(0,0,0,.35);
   }
 
+  /* ===== 独占マーク ===== */
+  .cell.station.monopoly-0 {
+    box-shadow: 0 3px 0 #2a8ce0, 0 6px 12px rgba(42,140,224,.4), 0 0 0 5px #7cc4ff;
+  }
+  .cell.station.monopoly-1 {
+    box-shadow: 0 3px 0 #f08020, 0 6px 12px rgba(240,128,32,.4), 0 0 0 5px #ffb060;
+  }
+  .cell.station.monopoly-2 {
+    box-shadow: 0 3px 0 #60a020, 0 6px 12px rgba(96,160,32,.4), 0 0 0 5px #a0e070;
+  }
+  .cell.station.monopoly-3 {
+    box-shadow: 0 3px 0 #e05090, 0 6px 12px rgba(224,80,144,.4), 0 0 0 5px #ff90c0;
+  }
+  .cell.station.goal-station.monopoly-0,
+  .cell.station.goal-station.monopoly-1,
+  .cell.station.goal-station.monopoly-2,
+  .cell.station.goal-station.monopoly-3 {
+    animation: goalPulse 1.6s infinite ease-in-out;
+  }
+
+  /* ===== 紙吹雪 ===== */
+  .confetti {
+    position: fixed;
+    top: -20px;
+    width: 10px;
+    height: 18px;
+    z-index: 9999;
+    pointer-events: none;
+    animation: confettiFall linear forwards;
+    border-radius: 2px;
+  }
+  @keyframes confettiFall {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+  }
+
   .station-label { position:absolute; top: calc(100% + 4px); left: 50%;
     transform: translateX(-50%);
     background: rgba(255,255,255,.96);
@@ -262,13 +298,12 @@
   #debugBtn { background:#888; color:#fff; font-size:10px; }
   button:disabled { background:#555 !important; cursor:not-allowed; opacity:.5; }
 
-  /* ===== 効果ポップアップ ===== */
   #effectDialog {
     position: fixed; left: 50%; top: 50%;
     transform: translate(-50%, -50%);
     z-index: 450;
     pointer-events: none;
-    display: flex; justify-content: center; align-items: center;
+    display: none; justify-content: center; align-items: center;
   }
   #effectDialog.hidden { display: none; }
   .effect-panel {
@@ -281,11 +316,6 @@
     box-shadow: 0 12px 40px rgba(0,0,0,.35);
     border: 3px solid #5a6a7a;
     pointer-events: auto;
-    animation: effectPop .3s ease-out;
-  }
-  @keyframes effectPop {
-    from { transform: scale(.8); opacity: 0; }
-    to   { transform: scale(1); opacity: 1; }
   }
   .effect-list {
     display: flex; flex-direction: column; gap: 8px;
@@ -305,7 +335,6 @@
     min-height: 48px;
     min-width: 120px;
   }
-  .effect-ok-btn:active { transform: scale(.95); }
 
   #handPanel { position: fixed; left:0; right:0; bottom:0; background:#fff;
     border-top: 3px solid #223; padding: 10px; max-height: 60vh;
@@ -836,15 +865,15 @@
   </div>
 </div>
 
-<script src="data.js?v=8"></script>
-<script src="cards.js?v=8"></script>
-<script src="properties.js?v=8"></script>
-<script src="events.js?v=8"></script>
-<script src="sound.js?v=8"></script>
-<script src="cpu.js?v=8"></script>
-<script src="main.js?v=16"></script>
-<script src="main2.js?v=16"></script>
-<script src="start.js?v=8"></script>
+<script src="data.js?v=18"></script>
+<script src="cards.js?v=18"></script>
+<script src="properties.js?v=18"></script>
+<script src="events.js?v=18"></script>
+<script src="sound.js?v=18"></script>
+<script src="cpu.js?v=18"></script>
+<script src="main.js?v=18"></script>
+<script src="main2.js?v=18"></script>
+<script src="start.js?v=18"></script>
 
 <script>
 if ("serviceWorker" in navigator) {
