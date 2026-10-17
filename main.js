@@ -752,11 +752,53 @@ function updateGuideArrow() {
   el.style.display = "block";
 }
 
+// ===== サイコロ演出 =====
+function animateDiceRoll(count, callback) {
+  const overlay = document.getElementById("diceOverlay");
+  const container = document.getElementById("diceContainer");
+  container.innerHTML = "";
+
+  const diceEls = [];
+  for (let i = 0; i < count; i++) {
+    const d = document.createElement("div");
+    d.className = "dice-box";
+    d.textContent = "?";
+    container.appendChild(d);
+    diceEls.push(d);
+  }
+
+  overlay.classList.add("show");
+  playSound("dice");
+
+  const interval = setInterval(() => {
+    for (const d of diceEls) {
+      d.textContent = Math.floor(Math.random() * 6) + 1;
+    }
+  }, 60);
+
+  setTimeout(() => {
+    clearInterval(interval);
+    
+    const results = [];
+    for (const d of diceEls) {
+      const val = Math.floor(Math.random() * 6) + 1;
+      d.textContent = val;
+      d.classList.add("stop");
+      results.push(val);
+    }
+
+    setTimeout(() => {
+      overlay.classList.remove("show");
+      callback(results);
+    }, 600);
+  }, 1000);
+}
+
 function rollDice() {
   if (hasRolledThisTurn) return;
   if (!player || player.isCPU) return;
   if (isMoving || !canRoll) return;
-  playSound("dice");
+
   canUseCard = false;
   canRoll = false;
   turnInProgress = true;
@@ -768,18 +810,18 @@ function rollDice() {
     log("🐌 のんびり中：サイコロ1個のみ");
   }
 
-  let total = 0;
-  const rolls = [];
-  for (let i = 0; i < count; i++) {
-    const r = Math.floor(Math.random() * 6) + 1;
-    rolls.push(r); total += r;
-  }
-  log("🎲 " + (count > 1 ? rolls.join("+") + "=" : "") + total + " マス");
-  remainingSteps = total;
-  isMoving = true;
-  turnPath = [player.pos];
-  updateHUD();
-  showMoveTargets();
+  animateDiceRoll(count, (results) => {
+    let total = 0;
+    for (const r of results) total += r;
+    
+    log("🎲 " + (results.length > 1 ? results.join("+") + "=" : "") + total + " マス");
+    
+    remainingSteps = total;
+    isMoving = true;
+    turnPath = [player.pos];
+    updateHUD();
+    showMoveTargets();
+  });
 }
 
 function findReachable(fromId, maxSteps) {
