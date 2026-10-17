@@ -2,6 +2,78 @@
 // main2.js - ゲームロジック（後半）
 // ========================================
 
+// ===== 紙吹雪 =====
+function showConfetti(count) {
+  const colors = ["#ff6b9d","#feca57","#48dbfb","#ff9ff3","#54a0ff","#5f27cd","#1dd1a1"];
+  const n = count || 40;
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = Math.random() * 100 + "vw";
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    c.style.animationDelay = (Math.random() * 0.5) + "s";
+    c.style.animationDuration = (1.5 + Math.random() * 1.5) + "s";
+    c.style.width = (6 + Math.random() * 8) + "px";
+    c.style.height = (10 + Math.random() * 12) + "px";
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 3500);
+  }
+}
+
+// ===== CPU掛け合い =====
+const CPU_LINES = {
+  goal: [
+    "やった！目的地ゲット！",
+    "ふふ、先に着いちゃった",
+    "ここは俺の庭だからね",
+    "意外と近かったな",
+    "賞金うまい！",
+    "ようやく着いた…",
+  ],
+  buyProperty: [
+    "この物件、いただき！",
+    "ここは俺の土地だ",
+    "埼玉の不動産は美味しいね",
+    "将来値上がりするぞ、これ",
+    "独占したら儲かるかな",
+    "これで俺の縄張りが広がる",
+  ],
+  getMoney: [
+    "ラッキー！",
+    "お金が増えた！",
+    "これは嬉しい誤算だ",
+    "もっと欲しいな",
+  ],
+  loseMoney: [
+    "うわ、減った…",
+    "痛いなぁ…",
+    "ここでピンチか",
+    "ちっ、財布が軽い",
+  ],
+  getCard: [
+    "お、カードゲット！",
+    "これで巻き返すぞ",
+    "使うのが楽しみだ",
+  ],
+  hell: [
+    "ヘリでひとっ飛び！",
+    "空から失礼～",
+  ],
+  event: [
+    "何か起きた？",
+    "おっと、イベントだ",
+    "ラッキーかアンラッキーか…",
+  ],
+};
+
+function cpuSpeak(category) {
+  if (!player || !player.isCPU) return;
+  const lines = CPU_LINES[category];
+  if (!lines || lines.length === 0) return;
+  const line = lines[Math.floor(Math.random() * lines.length)];
+  log("💬 " + player.name + "：「" + line + "」");
+}
+
 function applyCellEffect(cellId) {
   const c = CELL_BY_ID[cellId];
   if (!c) return false;
@@ -14,6 +86,7 @@ function applyCellEffect(cellId) {
     triggerRandomEvent();
     collectingEffects = false;
     updateHUD();
+    if (player.isCPU) cpuSpeak("event");
     if (collectedEffects.length > 0) {
       showEffectPopup(continueAfterMove);
       return true;
@@ -30,6 +103,7 @@ function applyCellEffect(cellId) {
       drawAllPlayers();
       applyCamera();
       log("🚁 " + player.name + " がヘリポートで移動！");
+      if (player.isCPU) cpuSpeak("hell");
     } else {
       log("🚁 ヘリポート（他に行き先なし）");
     }
@@ -90,6 +164,7 @@ function applyCellEffect(cellId) {
     giveRandomCard();
     collectingEffects = false;
     updateHUD();
+    if (player.isCPU) cpuSpeak("getCard");
     if (collectedEffects.length > 0) {
       showEffectPopup(continueAfterMove);
       return true;
@@ -102,6 +177,7 @@ function applyCellEffect(cellId) {
     const a = Math.floor(base * mult);
     player.money += a;
     log("🟦 " + player.name + " +" + ky(a));
+    if (player.isCPU) cpuSpeak("getMoney");
 
     for (const p of players) {
       if (p === player) continue;
@@ -124,6 +200,7 @@ function applyCellEffect(cellId) {
     const a = Math.floor(base * mult);
     player.money -= a;
     log("🟥 " + player.name + " −" + ky(a));
+    if (player.isCPU) cpuSpeak("loseMoney");
     collectingEffects = false;
     updateHUD();
     if (collectedEffects.length > 0) {
@@ -148,6 +225,8 @@ function applyCellEffect(cellId) {
     }
     player.money += prize;
     log("🏆 " + arrivedPlayerName + " 賞金 +" + ky(prize));
+    showConfetti(60);
+    cpuSpeak("goal");
 
     for (const p of players) {
       if (p === player) continue;
@@ -263,6 +342,7 @@ function checkPendingDialogsOrProceed() {
 
 function cpuBuyProperty(cellId) {
   const props = getPropsAtStation(cellId);
+  let bought = 0;
   for (const p of props) {
     if (p.owner === null && player.money >= p.price) {
       const buyChance = player.cpuLevel === 1 ? 0.3
@@ -270,9 +350,11 @@ function cpuBuyProperty(cellId) {
       if (Math.random() < buyChance) {
         buyProperty(p.id);
         log("🏘 " + player.name + " が " + p.name + " を購入");
+        bought++;
       }
     }
   }
+  if (bought > 0) cpuSpeak("buyProperty");
 }
 
 function giveRandomCard() {
@@ -680,6 +762,7 @@ function showRankingDialog() {
 function endGame() {
   stopBGM();
   playSound("victory");
+  showConfetti(120);
   log("🎉 ゲーム終了！");
 
   localStorage.removeItem("saitama_auto");
