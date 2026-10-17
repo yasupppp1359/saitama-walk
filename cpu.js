@@ -145,24 +145,29 @@ function cpuTakeTurn() {
 }
 
 function cpuRollDice() {
-  if (!player.isCPU || !turnInProgress) return;
+  if (!player || !player.isCPU) return;
+  if (!turnInProgress) return;
   if (!canRoll) return;
 
-  // rollDiceと同じ処理
   canUseCard = false;
   canRoll = false;
-  const count = thisTurn.diceCount;
-  let total = 0;
-  const rolls = [];
-  for (let i = 0; i < count; i++) {
-    const r = Math.floor(Math.random() * 6) + 1;
-    rolls.push(r); total += r;
+  
+  let count = thisTurn.diceCount;
+  if (player.buffs.nonbiri > 0) {
+    count = 1;
   }
-  log("🎲 " + player.name + ": " +
-      (count > 1 ? rolls.join("+") + "=" : "") + total + " マス");
-  remainingSteps = total;
-  isMoving = true;
-  turnPath = [player.pos];
-  updateHUD();
-  showMoveTargets();
+
+  animateDiceRoll(count, (results) => {
+    let total = 0;
+    for (const r of results) total += r;
+    
+    log("🎲 " + player.name + ": " +
+        (results.length > 1 ? results.join("+") + "=" : "") + total + " マス");
+    
+    remainingSteps = total;
+    isMoving = true;
+    turnPath = [player.pos];
+    updateHUD();
+    showMoveTargets();
+  });
 }
