@@ -411,6 +411,7 @@ function drawBoard() {
   }
   drawAllPlayers();
   updateGoalBanner();
+  updateGuideArrow();
   applyCamera();
   redrawYellowed();
 }
@@ -644,6 +645,8 @@ function updateHUD() {
   } else {
     goalReachBtn.classList.remove("show");
   }
+
+  updateGuideArrow();
 }
 
 function shortestDistance(from, goal) {
@@ -667,6 +670,86 @@ function shortestDistance(from, goal) {
     }
   }
   return Infinity;
+}
+
+function findPath(from, goal) {
+  const q = [[from, 0]];
+  const seen = new Set([from]);
+  const parentMap = { [from]: null };
+  while (q.length) {
+    const [id, d] = q.shift();
+    if (id === goal) {
+      const path = [];
+      let cur = id;
+      while (cur !== null) {
+        path.unshift(cur);
+        cur = parentMap[cur];
+      }
+      return path;
+    }
+    const cell = CELL_BY_ID[id];
+    if (cell && cell.next) {
+      for (const n of cell.next) {
+        if (poos.has(n) || seen.has(n)) continue;
+        seen.add(n);
+        parentMap[n] = id;
+        q.push([n, d + 1]);
+      }
+    }
+    if (PARENTS[id]) {
+      for (const p of PARENTS[id]) {
+        if (poos.has(p) || seen.has(p)) continue;
+        seen.add(p);
+        parentMap[p] = id;
+        q.push([p, d + 1]);
+      }
+    }
+  }
+  return null;
+}
+
+function updateGuideArrow() {
+  if (!player) return;
+  let el = document.getElementById("guideArrow");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "guideArrow";
+    el.textContent = "➤";
+    boardEl.appendChild(el);
+  }
+
+  if (player.isCPU || isMoving) {
+    el.style.display = "none";
+    return;
+  }
+
+  const playerCell = CELL_BY_ID[player.pos];
+  const goalCell = CELL_BY_ID[GOAL_ID];
+  if (!playerCell || !goalCell) {
+    el.style.display = "none";
+    return;
+  }
+
+  const path = findPath(player.pos, GOAL_ID);
+  let targetX = goalCell.x;
+  let targetY = goalCell.y;
+
+  if (path && path.length >= 2) {
+    const nextCell = CELL_BY_ID[path[1]];
+    if (nextCell) {
+      targetX = nextCell.x;
+      targetY = nextCell.y;
+    }
+  }
+
+  const dx = targetX - playerCell.x;
+  const dy = targetY - playerCell.y;
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+  el.style.left = (playerCell.x - 15) + "px";
+  el.style.top = (playerCell.y - 55) + "px";
+  el.style.transform = `rotate(${angle}deg)`;
+  el.style.display = "block";
 }
 
 function rollDice() {
